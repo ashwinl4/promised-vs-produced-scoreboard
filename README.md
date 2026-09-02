@@ -161,26 +161,46 @@ names. The pipeline can read those files but never writes to them.
 One command finds new projects and extracts them into rows:
 
 ```bash
-N=10 bash collect/all.sh
+python3 scoreboard.py collect --n 10
 ```
 
 Each iteration starts a fresh headless Claude Code worker that searches the web
-and writes through the CLI, so you need the `claude` CLI installed and logged in
-once (run `claude`, then `/login`). Stopping with Ctrl-C is safe, and re-running
-picks up where you left off because the database de-duplicates.
+and writes through the CLI, so this path needs the `claude` CLI installed and
+logged in once (run `claude`, then `/login`). It checks that before it starts.
+Stopping with Ctrl-C is safe, and re-running picks up where you left off because
+the database de-duplicates.
 
 Check the plan before spending anything:
 
 ```bash
-N=5 DRY_RUN=1 bash collect/all.sh
+python3 scoreboard.py collect --n 5 --dry-run
 ```
 
-Each stage starts one worker per iteration, so `N=10` across both stages is 20 or
-more worker calls. Start small.
+Each stage starts one worker per iteration, so `--n 10` across both stages is 20
+or more worker calls. Start small.
 
-This path needs no API key. A separate direct-API path (`source-collect`,
-`screen-extract`, `automate`) uses the Anthropic API and needs
-`ANTHROPIC_API_KEY`.
+### Four ways in, and only two of them need Anthropic
+
+Collection is the only part of the Scoreboard that touches a model at all. The
+data model, the checker, the human gate, the review loop, the exports and the
+coverage measure are standard-library Python with no provider anywhere.
+
+| Path | What you run | Needs | Works with |
+|---|---|---|---|
+| **manual** | `source-add`, `screen-add` | nothing | you and a browser |
+| **prompt** | `source-prompt`, `screen-prompt` | nothing, no key | **any assistant that can search the web** |
+| **direct API** | `source-collect`, `screen-extract`, `automate` | `ANTHROPIC_API_KEY` | Anthropic only |
+| **loops** | `collect` | the `claude` CLI, logged in | Claude Code only |
+
+The **prompt** row is the one worth knowing about. `source-prompt` prints text
+and nothing else. Paste it into ChatGPT, Gemini, Perplexity, Claude, or read it
+yourself and do the searching by hand; whatever comes back is one JSON object,
+and `source-add --json` ingests it. Nothing in that loop is Anthropic-specific,
+and the operating prompts say nothing about which model is reading them.
+
+The two automated paths are the Anthropic-specific ones. They are faster, not
+more capable: all four write the same rows through the same functions and face
+the same schema check and the same human gate.
 
 Per-stage settings are in [`docs/collecting.md`](docs/collecting.md). The manual
 and copy-the-prompt paths are in [`docs/cli.md`](docs/cli.md).

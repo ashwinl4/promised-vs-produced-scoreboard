@@ -169,6 +169,7 @@ def _landing(conn, prog: str) -> None:
         print(f"  {prog} {cyan('verify-list')}     the published data")
         print(f"  {prog} {cyan('review')}          work the queue, one row at a time")
         print(f"  {prog} {cyan('webapp')}          the same, in a browser")
+        print(f"  {prog} {cyan('collect')}         add new projects (--dry-run first)")
     print()
     print(f"Every command:  {prog} --help")
 
@@ -196,6 +197,38 @@ def _warn_if_exports_stale() -> None:
                   file=sys.stderr)
     except OSError:
         pass
+
+
+# --- Collection ------------------------------------------------------------ #
+
+def cmd_collect(conn, args):
+    from pipeline.db import SCOREBOARD_ROOT
+    script = SCOREBOARD_ROOT / "collect" / "all.sh"
+    if not script.exists():
+        raise SystemExit(f"collection script not found: {script}")
+
+    # all.sh reads four knobs from the environment. Everything else it
+    # understands (SOURCE_EFFORT, SCREEN_VERBOSE, MODEL, the SOURCE_/SCREEN_
+    # prefixes) is left to pass through untouched, so the shell form loses
+    # nothing by being wrapped.
+    env = dict(os.environ)
+    env["N"] = str(args.n)
+    env["ONLY"] = args.only
+    if args.dry_run:
+        env["DRY_RUN"] = "1"
+    if args.continue_on_fail:
+        env["CONTINUE_ON_FAIL"] = "1"
+
+    # The loop spawns workers that write through this same CLI, and each of
+    # those closes its own connection, so the CSV exports stay current without
+    # this process doing anything. Hand ours back before replacing the process.
+    conn.close()
+
+    # exec rather than subprocess: the script installs its own INT/TERM trap,
+    # and replacing the process leaves Ctrl-C behaving exactly as documented
+    # instead of racing a Python KeyboardInterrupt against it.
+    os.chdir(SCOREBOARD_ROOT)
+    os.execvpe("bash", ["bash", str(script)], env)
 
 
 # --- tools/ commands ------------------------------------------------------- #
@@ -760,7 +793,7 @@ def _paint(text: str, colour: bool) -> str:
                       lambda m: wrap("cyan", m.group(1)), line)
 
         # The path tags already carried by the per-command help strings.
-        line = re.sub(r"\[(manual|API|Claude Code|human gate)\]",
+        line = re.sub(r"\[(manual|prompt|API|Claude Code|human gate)\]",
                       lambda m: wrap("yellow", m.group(0)), line)
 
         # The three check verdicts, wherever they are mentioned.
@@ -838,18 +871,20 @@ def _epilog(prog: str) -> str:
     {ENTRY} screen-check --id 57          a FAIL blocks promotion
     {ENTRY} screen-check --all            recheck every Screen row
 
-  {_H}collect with Claude Code (no API key){_H}
-    {ENTRY} source-prompt                 paste into a web assistant
-    {ENTRY} screen-prompt --source-id 12  then screen-add it back
+  {_H}collect by pasting a prompt (no key, any assistant){_H}
+    {ENTRY} source-prompt                 paste it anywhere that
+    {ENTRY} screen-prompt --source-id 12  can search the web, then
+                                          source-add / screen-add it back
 
   {_H}collect over the API (needs ANTHROPIC_API_KEY){_H}
     {ENTRY} source-collect                one new lead from the web
     {ENTRY} screen-extract --source-id 12 that lead into a row
     {ENTRY} automate --n 5                five leads, Source to Screen
 
-  {_H}the shell loops (the usual path; needs the claude CLI, logged in){_H}
-    N=5 DRY_RUN=1 bash collect/all.sh
-    N=10 bash collect/all.sh
+  {_H}collect automatically (the usual path; needs the claude CLI){_H}
+    {ENTRY} collect --n 5 --dry-run       the plan, spending nothing
+    {ENTRY} collect --n 10                both stages, 10 rows each
+    {ENTRY} collect --only screen --n 5   one stage
 
   {_H}try things on a copy{_H}
     cp outputs/scoreboard.db /tmp/try.db
@@ -959,6 +994,35 @@ def _command_examples() -> dict:
   An ambiguous row is never counted as covered, and recall is reported as
   a range whenever any exist. --selftest checks the matcher against pairs
   whose answer is known by hand, and should stay at 10/10.
+""",
+        "collect": f"""{_H}examples{_H}
+  {ENTRY} collect --n 5 --dry-run     the plan, spending nothing
+  {ENTRY} collect --n 10              both stages, 10 rows each
+  {ENTRY} collect --only source       find new projects, do not extract
+  {ENTRY} collect --only screen       extract leads already collected
+
+{_H}this one spends money{_H}
+  Each iteration starts a fresh headless Claude Code worker that searches
+  the web and writes through this CLI. Each stage runs one worker per row,
+  so --n 10 across both stages is twenty or more worker calls. Start small,
+  and use --dry-run first.
+
+  Needs the `claude` CLI installed and logged in once: run `claude`, then
+  /login. It checks before starting rather than failing partway through.
+
+{_H}stopping and resuming{_H}
+  Ctrl-C is safe. Each iteration is a separate stateless worker, so nothing
+  is half-written, and re-running continues where you left off because the
+  database de-duplicates.
+
+{_H}the other three ways in{_H}
+  This is the only path that needs Claude Code. source-prompt prints the
+  same instructions for any assistant that can search the web, source-add
+  takes a row you wrote yourself, and automate uses the Anthropic API
+  directly. All four write the same rows through the same checks.
+
+  Every other knob (SOURCE_EFFORT, SCREEN_VERBOSE, MODEL, the SOURCE_ and
+  SCREEN_ prefixes) still passes through the environment: docs/collecting.md
 """,
         "review": f"""{_H}examples{_H}
   {ENTRY} review                    every row waiting, largest first
@@ -1172,6 +1236,17 @@ def build_parser() -> argparse.ArgumentParser:
         .set_defaults(fn=cmd_initdb)
     sub.add_parser("status", help="row counts per stage").set_defaults(fn=cmd_status)
 
+    s = sub.add_parser("collect", help="[Claude Code] find new projects and extract them")
+    s.add_argument("--n", type=int, default=10,
+                   help="rows to add at each stage (default 10)")
+    s.add_argument("--only", choices=["source", "screen", "both"], default="both",
+                   help="run one stage instead of both (default both)")
+    s.add_argument("--dry-run", action="store_true",
+                   help="print the plan and call nothing")
+    s.add_argument("--continue-on-fail", action="store_true",
+                   help="keep going when an iteration fails")
+    s.set_defaults(fn=cmd_collect)
+
     s = sub.add_parser("review", help="work through the review queue, guided")
     s.add_argument("--id", type=int,
                    help="review one screen row rather than the whole queue")
@@ -1197,7 +1272,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(fn=cmd_source_add)
 
     s = sub.add_parser("source-prompt",
-                       help="[Claude Code] print the Source prompt to run in a web-search assistant")
+                       help="[prompt] print the Source prompt, for any web-search assistant")
     s.set_defaults(fn=cmd_source_prompt)
 
     sub.add_parser("source-collect", help="[API] collect one new Source lead from the web") \
@@ -1211,7 +1286,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(fn=cmd_screen_add)
 
     s = sub.add_parser("screen-prompt",
-                       help="[Claude Code] print the Screen prompt for a Source lead")
+                       help="[prompt] print the Screen prompt for a Source lead")
     s.add_argument("--source-id", type=int, required=True,
                    help="the source_collected id to render the prompt for")
     s.set_defaults(fn=cmd_screen_prompt)

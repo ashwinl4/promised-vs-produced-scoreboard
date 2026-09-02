@@ -12,12 +12,20 @@ Source leads into Screen rows. Neither touches Verify, which is a human gate.
 
 ## Run it
 
-Run from the parent directory (`scoreboard/`). Needs the `claude` CLI logged in once
-(`claude`, then `/login`).
+Run from the parent directory (`scoreboard/`). Needs the `claude` CLI logged in
+once (`claude`, then `/login`); the loop checks that before it starts.
 
 ```bash
-N=5 DRY_RUN=1 bash collect/all.sh   # show the plan
-N=10 bash collect/all.sh            # do it
+python3 scoreboard.py collect --n 5 --dry-run   # show the plan
+python3 scoreboard.py collect --n 10            # do it
+```
+
+The scripts still run directly, and that is the form to use when you want a knob
+the flags do not expose (see [`../docs/collecting.md`](../docs/collecting.md)):
+
+```bash
+N=5 DRY_RUN=1 bash collect/all.sh   # identical to the first command above
+N=10 bash collect/all.sh            # identical to the second
 ```
 
 ## What is here

@@ -21,22 +21,30 @@ command below spawns fresh Claude Code workers via the loop scripts.
 ### ⭐ START HERE — PROMPT 1 + PROMPT 2 in one command
 
 Collecting leads then extracting them is the normal session, so it has a single
-runner directly under `collect/`:
+runner, reachable as a command:
 
 ```bash
-N=10 bash collect/all.sh
+python3 scoreboard.py collect --n 10
 ```
 
 → adds 10 to `source_collected` (PROMPT 1), then 10 to `screen_extracted`
 (PROMPT 2), then prints one before/after summary.
 
+The command covers the four knobs most sessions need. Everything else is set the
+way the shell has always set it, by prefixing the variable to `bash collect/all.sh`:
+
 | want | command |
 |---|---|
-| see the plan without calling Claude | `N=5 DRY_RUN=1 bash collect/all.sh` |
+| see the plan without calling Claude | `python3 scoreboard.py collect --n 5 --dry-run` |
+| only one stage | `python3 scoreboard.py collect --only screen --n 5` |
+| keep going after a failed iteration | `python3 scoreboard.py collect --n 10 --continue-on-fail` |
 | different sizes per stage | `SOURCE_ADD=10 SCREEN_ADD=4 bash collect/all.sh` |
-| only one stage | `ONLY=screen N=5 bash collect/all.sh` |
 | cheaper discovery, careful extraction | `SOURCE_EFFORT=medium SCREEN_EFFORT=high N=8 bash collect/all.sh` |
 | stream one stage live | `SCREEN_VERBOSE=1 N=3 bash collect/all.sh` |
+
+`VAR=value` before a command is shell syntax for setting that variable for that
+one run: it does not persist afterwards, and it must come *before* `bash`, not
+after the script name. The flags above need none of that.
 
 **Per-stage config:** any knob below can be prefixed `SOURCE_` or `SCREEN_` to
 aim it at one stage; the prefixed value beats the shared one. So
