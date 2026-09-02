@@ -23,6 +23,8 @@ import argparse
 import json
 import os
 import re
+import subprocess
+import shutil
 import sys
 
 # --- Allow both `python -m pipeline.cli` and `python pipeline/cli.py` -------- #
@@ -785,6 +787,53 @@ def _paint(text: str, colour: bool) -> str:
     return "\n".join(out)
 
 
+def _write_paged(text: str) -> None:
+    """Print `text`, through $PAGER when it will not fit on the screen.
+
+    --help is around 130 lines and a terminal shows a fraction of that, so
+    without this the top of it scrolls away before you can read it. git pages
+    its help for the same reason.
+
+    Paging is skipped whenever it would be unhelpful or surprising: not a
+    terminal (a pipe or a redirect gets the plain text), short enough to fit
+    anyway, or PAGER set to empty, which is the usual way to say "don't".
+    """
+    out = sys.stdout
+    if not (hasattr(out, "isatty") and out.isatty()):
+        out.write(text)
+        return
+    try:
+        rows = shutil.get_terminal_size().lines
+    except Exception:                                           # noqa: BLE001
+        rows = 24
+    if text.count("\n") < rows - 1:
+        out.write(text)
+        return
+
+    pager = os.environ.get("PAGER")
+    if pager is None:
+        pager = "less" if shutil.which("less") else ""
+    if not pager.strip():
+        out.write(text)
+        return
+
+    env = dict(os.environ)
+    # F: quit immediately if it fits after all. R: pass the colour through
+    # rather than printing escape codes. X: do not wipe the screen on exit.
+    # setdefault, so a LESS the reader has already chosen wins.
+    env.setdefault("LESS", "FRX")
+    try:
+        proc = subprocess.Popen(pager, shell=True, stdin=subprocess.PIPE, env=env)
+        proc.communicate(text.encode("utf-8"))
+    except (OSError, BrokenPipeError, KeyboardInterrupt):
+        # Quitting the pager early, or not having one, must not look like a
+        # failure of the command you actually ran.
+        try:
+            out.write(text)
+        except BrokenPipeError:
+            pass
+
+
 class _Parser(argparse.ArgumentParser):
     """An ArgumentParser that colours its help on the way out."""
 
@@ -793,6 +842,14 @@ class _Parser(argparse.ArgumentParser):
 
     def format_usage(self):
         return _paint(super().format_usage(), _use_colour(sys.stderr))
+
+    def print_help(self, file=None):
+        # Only the terminal gets paged; an explicit file argument is someone
+        # capturing the text, and must be left alone.
+        if file is None:
+            _write_paged(self.format_help())
+        else:
+            file.write(self.format_help())
 
 
 def _epilog(prog: str) -> str:
@@ -891,6 +948,13 @@ def _epilog(prog: str) -> str:
   Every command creates the five tables when they are missing. A mistyped
   path therefore opens a new empty database and reports zeros. If the counts
   look wrong, check the path.
+
+{_H}further reading{_H}
+  docs/cli.md             every command in one list, the module map, and a
+                          walkthrough on a copy of the database
+  docs/schema.md          the five tables, the 17 columns, and the date handling
+  docs/collecting.md      every knob the collection loops take
+  docs/verify_methods.md  what to look for before publishing a row
 
 Per-command help, with its own examples:  {prog} <command> --help
 """
@@ -1033,6 +1097,8 @@ def _command_examples() -> dict:
 
   It needs a terminal. Under a pipe or in a script, use screen-list,
   screen-show and verify-promote instead.
+
+  What to look for while reading the sources: docs/verify_methods.md
 """,
         "webapp": f"""{_H}examples{_H}
   {ENTRY} webapp                      http://127.0.0.1:8100
@@ -1088,6 +1154,8 @@ def _command_examples() -> dict:
   verify-promote, by a person.
 
   Every run appends to screen_check, so the history is kept.
+
+  The columns it checks and the date handling: docs/schema.md
 """,
         "screen-list": f"""{_H}examples{_H}
   {ENTRY} screen-list             insertion order
@@ -1112,6 +1180,8 @@ def _command_examples() -> dict:
   --force    promote despite a FAIL. The override is recorded.
 
   Publishing the same project twice is refused.
+
+  What to look for while reading the sources: docs/verify_methods.md
 """,
         "verify-edit": f"""{_H}examples{_H}
   {ENTRY} verify-edit --id 6 \\
