@@ -1098,6 +1098,10 @@ def _command_examples() -> dict:
   It needs a terminal. Under a pipe or in a script, use screen-list,
   screen-show and verify-promote instead.
 
+  The web app does the same job and needs pip install: it shows the row
+  beside its sources rather than printing the links, and lets you correct
+  any cell in a form. This needs nothing installed.
+
   What to look for while reading the sources: docs/verify_methods.md
 """,
         "webapp": f"""{_H}examples{_H}
@@ -1110,6 +1114,11 @@ def _command_examples() -> dict:
   beside its two sources, so you can correct cells and promote it with the
   reason recorded. To read the data, the CLI and the CSV exports are faster
   and need nothing installed.
+
+  `review` does the same job in the terminal and needs nothing installed.
+  It prints the two links instead of showing the pages, so use it when you
+  are working the queue in order, and this when you want to see a row and
+  its sources at once.
 
 {_H}what it needs{_H}
   FastAPI and uvicorn, the only dependencies in this project:

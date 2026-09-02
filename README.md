@@ -211,6 +211,18 @@ and copy-the-prompt paths are in [`docs/cli.md`](docs/cli.md).
 
 ## Publish a row
 
+Three routes to the same gate. They write the same row through the same
+function, so the choice is only about how you would rather read the sources.
+
+| | Needs | Best for |
+|---|---|---|
+| `python3 scoreboard.py review` | nothing | working the queue in order. Prints each row's figures and both links, then asks about them one at a time. |
+| `python3 scoreboard.py webapp` | `pip install` | reading a row *beside* its sources in a browser, and correcting any of the 17 cells in a form. |
+| `verify-promote` by hand | nothing | one particular row, or a script. |
+
+The rest of this section is the third route, which is also what the other two
+run underneath.
+
 Find a row that passed its check and read it:
 
 ```bash
@@ -238,7 +250,8 @@ Corrections after publication always require a reason, and are written to
 
 ```bash
 python3 scoreboard.py verify-edit --id 6 \
-    --set current_status="AT VOLUME" --desc "Re-read the Q3 release."
+    --set current_status="Delayed — production pushed to 2027" \
+    --desc "Re-read the Q3 release."
 ```
 
 [`docs/verify_methods.md`](docs/verify_methods.md)
