@@ -3,8 +3,9 @@ gather.py -- batch collection driver for the medallion pipeline via the direct
 Anthropic API (flavour B in llm.py), NOT Claude Code.
 
 This is the batch shape the pipeline wants: gather *many* Source leads in one
-run, then extract only *some* of them into Screen -- because, as the spec puts
-it, it is completely fine (expected, even) for
+run, then extract only *some* of them into Screen. Finding a lead is cheap (two
+links and a summary); extracting one is not (open both links, fill 17 columns),
+and publishing costs a person's attention. So the funnel is expected to be steep:
 
     #source_collected  >>  #screen_extracted  >  #verify_verified
 
@@ -39,12 +40,12 @@ import time
 from pathlib import Path
 
 # tools/ -> scoreboard/, so `pipeline` imports resolve.
-_DATASET = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_DATASET))
+_SCOREBOARD_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_SCOREBOARD_ROOT))
 
 # config.env sits in the scoreboard directory, beside scoreboard.py, because that is
 # where every command is run from. It is gitignored.
-_CONFIG_ENV_PATH = _DATASET / "config.env"
+_CONFIG_ENV_PATH = _SCOREBOARD_ROOT / "config.env"
 
 
 def _load_config_env(path: Path = _CONFIG_ENV_PATH) -> None:

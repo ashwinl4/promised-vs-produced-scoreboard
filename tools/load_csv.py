@@ -33,14 +33,14 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DATASET = HERE.parent
-sys.path.insert(0, str(DATASET))            # so `pipeline` imports
+SCOREBOARD_ROOT = HERE.parent
+sys.path.insert(0, str(SCOREBOARD_ROOT))            # so `pipeline` imports
 
 from pipeline import db as mdb          # noqa: E402
 from pipeline import source, screen, verify  # noqa: E402
 from pipeline.schema_check import V0_COLUMNS, RAW_DATE_COLUMNS  # noqa: E402
 
-DEFAULT_DB = DATASET / "outputs" / "scoreboard.db"
+DEFAULT_DB = SCOREBOARD_ROOT / "outputs" / "scoreboard.db"
 DEFAULT_COLLECTED_VIA = "bulk-import"   # override with --via
 
 # screen_extracted / verify_verified declare these NOT NULL, so a row missing any

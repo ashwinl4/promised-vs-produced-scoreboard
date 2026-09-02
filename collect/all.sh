@@ -51,14 +51,14 @@ set -euo pipefail
 trap 'echo; echo "interrupted -- stopping."; exit 130' INT TERM
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-DATASET="$(cd "$HERE/.." && pwd)"
+SCOREBOARD_ROOT="$(cd "$HERE/.." && pwd)"
 SOURCE_LOOP="$HERE/source.sh"
 SCREEN_LOOP="$HERE/screen.sh"
 for f in "$SOURCE_LOOP" "$SCREEN_LOOP"; do
   [ -f "$f" ] || { echo "ERROR: missing $f"; exit 1; }
 done
 
-cd "$DATASET"
+cd "$SCOREBOARD_ROOT"
 PY="$(command -v python3 || command -v python)"
 
 # --- Config ---------------------------------------------------------------- #

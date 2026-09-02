@@ -52,10 +52,10 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DATASET = HERE.parent
-sys.path.insert(0, str(DATASET))
+SCOREBOARD_ROOT = HERE.parent
+sys.path.insert(0, str(SCOREBOARD_ROOT))
 
-DEFAULT_DB = DATASET / "outputs" / "scoreboard.db"
+DEFAULT_DB = SCOREBOARD_ROOT / "outputs" / "scoreboard.db"
 
 # Words that describe a facility rather than identify it. Stripped before
 # scoring so "TSMC Fab 1 Phoenix" and "TSMC Arizona Fabs" are not penalised for

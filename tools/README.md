@@ -1,16 +1,22 @@
 # tools
 
-Scripts that operate on an existing `scoreboard.db` without being part of the
-normal Source → Screen → Verify flow: moving data in or out, repairing it, or
-driving collection a different way.
+Scripts that operate on an existing `scoreboard.db`: moving data in or out,
+measuring it, or driving collection a different way.
 
 Run them from the parent directory (`scoreboard/`).
 
-Two of them are also CLI commands, because they are things people do rather than
-maintenance: `python3 scoreboard.py export` and `python3 scoreboard.py coverage`.
-Same code either way, and both scripts still run on their own. The other two stay
-scripts: `load_csv.py` is rare and can write to Verify in bulk, and `gather.py`
-is the batch driver for the direct-API path.
+Two are also CLI commands, because they are things people do routinely:
+`python3 scoreboard.py export` and `python3 scoreboard.py coverage`. Same code
+either way, and both scripts still run on their own.
+
+The other two stay scripts, for different reasons. `load_csv.py` is a rare
+one-off and its `--promote-tier` can write to Verify in bulk, so putting it
+beside `review` in `--help` would make a sharp tool look routine. `gather.py` is
+a real collection path, not maintenance: it is the direct-API counterpart to the
+`collect` command. It stays a script because `collect` and `gather` are synonyms,
+and two commands with the same name for different engines would be worse than
+one command and one script. If the API path ever gets regular use, the shape to
+reach for is `collect --api`, not a second word for the same idea.
 
 **Contents**
 
