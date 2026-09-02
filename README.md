@@ -86,6 +86,7 @@ Those read only. Every command that writes is named as such below.
 ### 3. Run the web app — needs two packages
 
 ```bash
+python3 -m venv .venv && source .venv/bin/activate   # recommended, not required
 pip install -r pipeline/requirements.txt
 python3 scoreboard.py webapp             # then open http://localhost:8100
 ```

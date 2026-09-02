@@ -16,20 +16,34 @@ Scoreboard](../README.md#see-the-scoreboard) in the main README.
 
 ## Run it
 
+The rest of the Scoreboard runs on the standard library. This is the one part
+that needs packages installed: FastAPI, uvicorn and python-multipart.
+
 From the parent directory (`scoreboard/`), not from here:
 
 ```bash
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r pipeline/requirements.txt
 python3 scoreboard.py webapp
 ```
 
 Then open <http://localhost:8100>. Add `--reload` while editing, `--port` to
-move it, and `--db PATH` to review a copy rather than the real database.
+move it, and `--db PATH` to review a copy rather than the real database. Leave
+the environment later with `deactivate`; `.venv/` is gitignored.
 
-The `webapp` command runs uvicorn in process. That matters because `pip install` puts the
-`uvicorn` script somewhere that is often not on `PATH`, which is where
-`command not found: uvicorn` comes from. The equivalent by hand, still from the
-parent directory:
+### On the virtual environment
+
+It is a recommendation, not a requirement. Installing into your user site works
+too, and `scoreboard.py webapp` finds the packages either way, because it calls
+uvicorn in process rather than shelling out to the `uvicorn` script. That script
+is the usual source of `command not found: uvicorn`: `pip install --user` puts it
+somewhere like `~/Library/Python/3.9/bin`, which is often not on `PATH` even
+though the library imported perfectly well.
+
+What the environment buys you is keeping three packages out of the system
+interpreter, which on macOS is Apple's and worth leaving alone.
+
+By hand, without the command, still from the parent directory:
 
 ```bash
 python3 -m uvicorn webapp.main:app --port 8100
