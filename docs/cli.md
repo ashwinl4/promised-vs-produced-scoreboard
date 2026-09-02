@@ -1,150 +1,158 @@
-# Command reference (Part 3)
+# Command reference
 
 *Package: [`../pipeline/`](../pipeline/)*
 
-Every pipeline step is one command. The everyday ones are in the
-[scoreboard README](../README.md); this is all of them, plus the manual and
-Claude Code paths and an offline test. Run everything from `aici/scoreboard`.
+Every pipeline step is one command. `python3 scoreboard.py --help` lists all 24
+and carries worked examples for each; this file is the flat list, plus the three
+things `--help` cannot hold: what needs installing, how the modules fit together,
+and a walkthrough on a copy of the database.
 
-## What you need
-| You want to… | Install | Key? |
-|---|---|---|
-| Run the pipeline core + CLI (source/screen/verify moves, checks) | **nothing** — Python 3.9+ stdlib | no |
-| Use the web interface (`webapp`) | `pip install -r pipeline/requirements.txt` (FastAPI + uvicorn) | no |
-| **Claude Code path** for the AI steps (recommended, no key) | nothing extra | **no** |
-| Direct-API AI steps (`source-collect` / `screen-extract` / `tools/gather.py`) | `pip install anthropic` | yes (`ANTHROPIC_API_KEY`) |
+> **This file is machine-read.** `collect/source.sh` attaches it to every
+> collection worker with an `@`-mention, and both operating prompts tell the
+> worker it is the command reference. Keep the command list complete: a worker
+> that cannot find a flag here will guess at one.
 
-Run every command **from the `scoreboard/` directory**, e.g.
+Run everything from `aici/scoreboard`. Two invocations, identical in effect:
 
 ```bash
-cd aici/scoreboard
-python -m pipeline.cli --help
+python3 scoreboard.py <command>     # the documented entry point
+python -m pipeline.cli <command>    # the long form, and what the prompts use
 ```
 
-`config.env` in this directory is optional: put `SCOREBOARD_DB` or an API key there
-and `tools/gather.py` will read it (a real shell variable always wins). It is
-gitignored. The database defaults to `outputs/scoreboard.db`.
+## What you need
 
+| You want to… | Install | Key? |
+|---|---|---|
+| The pipeline core and CLI (every stage move, the checks, export, coverage) | **nothing**, Python 3.9+ stdlib | no |
+| The web interface (`webapp`) | `pip install -r pipeline/requirements.txt` | no |
+| The prompt path for the AI steps, with any assistant | nothing extra | **no** |
+| The direct-API steps (`source-collect`, `screen-extract`, `tools/gather.py`) | `pip install anthropic` | yes, `ANTHROPIC_API_KEY` |
+| The collection loops (`collect`) | the `claude` CLI, logged in | no |
+
+`config.env` in this directory is optional: put `SCOREBOARD_DB` or an API key
+there and `tools/gather.py` reads it, though a real shell variable always wins.
+It is gitignored. The database defaults to `outputs/scoreboard.db`.
+
+## Every command
+
+```bash
+# Orientation
+python3 scoreboard.py                       # counts, and where to go next
+python3 scoreboard.py status                # row counts per stage
+python3 scoreboard.py initdb                # create the five tables
+python3 scoreboard.py --help                # all of the below, with examples
+
+# Collect  (needs the claude CLI; spends money)
+python3 scoreboard.py collect --n 5 --dry-run
+python3 scoreboard.py collect --n 10 [--only source|screen] [--continue-on-fail]
+
+# Source
+python3 scoreboard.py source-add --promise URL --status URL [--summary "..."]
+python3 scoreboard.py source-add --json lead.json [--via LABEL]   # or --json -
+python3 scoreboard.py source-prompt                               # no key
+python3 scoreboard.py source-collect                              # needs a key
+python3 scoreboard.py source-list
+
+# Screen
+python3 scoreboard.py screen-prompt --source-id N                 # no key
+python3 scoreboard.py screen-add --json row.json --source-id N
+python3 scoreboard.py screen-extract --source-id N                # needs a key
+python3 scoreboard.py screen-check --id N          # or --all
+python3 scoreboard.py screen-list [--by-capital]
+python3 scoreboard.py screen-show --id N
+
+# Verify  (the human gate)
+python3 scoreboard.py review [--id N]              # guided, one row at a time
+python3 scoreboard.py verify-promote --screen-id N --tier V1 [--flag "..."] [--set col=val] [--force]
+python3 scoreboard.py verify-edit --id N --set col=val --desc "why"
+python3 scoreboard.py verify-show --id N           # row + edit history
+python3 scoreboard.py verify-list
+
+# Read, export, measure
+python3 scoreboard.py filter --capital 1000000000 --jobs 2000 --op OR --stage verify
+python3 scoreboard.py filter --capital 500000000  --jobs 400  --op AND --stage screen
+python3 scoreboard.py export [--out-dir DIR]       # five CSVs
+python3 scoreboard.py coverage --against ref.csv [--stage verify] [--min-capital N]
+python3 scoreboard.py coverage --selftest          # needs no database
+
+# The extensible sector vocabulary
+python3 scoreboard.py sectors-list
+python3 scoreboard.py sectors-add "Cement"
+
+# The browser interface
+python3 scoreboard.py webapp [--port 8100] [--reload]
+
+# Batch collection over the direct API  (needs a key)
+python3 tools/gather.py --n-source 10 --n-screen 3 [--dry-run]
+
+# Bulk CSV import  (rare; --promote-tier writes to Verify in bulk)
+python3 tools/load_csv.py --csv rows.csv --dry-run
+```
+
+Any command takes a global `--db PATH` **before** the command, and every command
+that changes the database refreshes `outputs/csv_tables/` as it closes.
 
 ## The modules behind the commands
 
 Each stage is a small module the two interfaces share:
 
-- `db.py` — the five-table SQLite schema + connection helpers.
-- `source.py` — insert / list Source leads.
-- `screen.py` — insert extracted rows; `run_check()` (Screen pt-2).
-- `schema_check.py` — **is** `screen_check`: it loads the canonical
-  `schema.py` and runs its row validator, returning the
-  `FAIL / PASS / CLEAN` verdict + the issue list.
-- `verify.py` — `promote()` (the human gate) and `edit()` (writes a `verify_edits`
-  row in the **same transaction** as every Verify update).
-- `orchestrate.py` — the moves between the stages (the AI runners, the explore-`filter`).
+- `db.py` — the five-table SQLite schema, connection handling, and the
+  connection subclass that keeps the CSV exports in step with the database.
+- `source.py` — insert and list Source leads.
+- `screen.py` — insert extracted rows; `run_check()` is Screen part two.
+- `schema_check.py` — **is** `screen_check`: it loads the canonical `schema.py`
+  and runs its row validator, returning the `FAIL / PASS / CLEAN` verdict and the
+  issue list.
+- `schema.py` — **the definition of the data**: the columns, the sector
+  vocabulary, the inclusion floor, and the row validator. Also runs standalone
+  against a CSV. If this file and any document disagree, this file is right.
+- `verify.py` — `promote()` (the human gate) and `edit()`, which writes a
+  `verify_edits` row in the **same transaction** as every Verify update.
+- `orchestrate.py` — the moves between the stages: the AI runners and the
+  explore-`filter`.
 - `dates.py` — the deterministic date standardization. Each date is kept as a
-  **`*_raw` → token → `*_dt`** chain: the extractor supplies the verbatim source text
-  (`*_raw`) and a clean normalized token; this module resolves the *token* to a `*_dt`
-  DATETIME (a fuzzy range → its "healthy middle") and computes the float `lag_years` /
-  `slip_years` (with `-1` "to be completed" / `-2` "cancelled" sentinels).
-- `llm.py` — the AI steps, in two flavours (Claude Code prompts vs. direct API).
+  **`*_raw` → token → `*_dt`** chain: the extractor supplies the verbatim source
+  text (`*_raw`) and a clean normalized token; this module resolves the token to
+  a `*_dt` DATETIME (a fuzzy range becomes its healthy middle) and computes the
+  float `lag_years` and `slip_years`, with `-1` "to be completed" and `-2`
+  "cancelled" sentinels.
+- `llm.py` — the AI steps in two flavours: rendered prompts (no key) and the
+  direct API. The prompt builders never import the Anthropic SDK.
 
+## The no-key path, with any assistant
 
-## The two interfaces
-
-#### A. CLI
-
-The initialisation point from a terminal. Every step, one command each:
-
-```bash
-python -m pipeline.cli initdb            # create the 5 tables
-python -m pipeline.cli status            # row counts per stage
-
-# Source
-python -m pipeline.cli source-add --promise URL --status URL [--summary "..."]
-python -m pipeline.cli source-add --json lead.json      # ingest a JSON lead
-python -m pipeline.cli source-prompt                    # <-- Claude Code path
-python -m pipeline.cli source-collect                   # direct API (needs key)
-python -m pipeline.cli source-list
-
-# Screen
-python -m pipeline.cli screen-prompt --source-id N      # <-- Claude Code path
-python -m pipeline.cli screen-add --json row.json --source-id N
-python -m pipeline.cli screen-extract --source-id N     # direct API (needs key)
-python -m pipeline.cli screen-check --id N              # or --all
-python -m pipeline.cli screen-list [--by-capital]
-
-# Verify (the human gate) + edits
-python -m pipeline.cli verify-promote --screen-id N --tier V1 [--flag "..."] [--set col=val]
-python -m pipeline.cli verify-edit --id N --set current_status="..." --desc "why"
-python -m pipeline.cli verify-show --id N                 # row + edit history
-python -m pipeline.cli verify-list
-
-# End-to-end (direct API)
-python3 tools/gather.py --n-source 10 --n-screen 3
-
-# Explore thresholds beyond the fixed floor (a plain SQL query; AND/OR)
-python -m pipeline.cli filter --capital 1000000000 --jobs 2000 --op OR --stage verify
-python -m pipeline.cli filter --capital 500000000  --jobs 400  --op AND --stage screen
-
-# The extensible sector vocabulary
-python -m pipeline.cli sectors-list
-python -m pipeline.cli sectors-add "Aerospace"
-```
-
-#### B. Web interface
-
-**Usually the most intuitive way to run this for humans** — every step in the CLI list above is
-built into the UI, so a normal session never needs the terminal.
-
-```bash
-pip install -r pipeline/requirements.txt
-python3 scoreboard.py webapp --reload --port 8100
-# open http://localhost:8100
-```
-
-Server-rendered HTML, plain forms, no JS build step. The dashboard shows the five
-stage counts and the database picker; the Source and Screen pages carry all
-three paths (manual / Claude Code / API); the **Verify** pages are the point of
-emphasis — promoting a passing Screen row is the human gate, and each Verify row
-has a full 17-field edit form whose saves are recorded in `verify_edits` with a
-required reason.
-
-
-### Running the AI steps with Claude Code (no Anthropic API key)
-
-This is the recommended way to do the "AI" Source/Screen steps without a key: the
-pipeline renders the exact operating prompt, **you** run it in a web-search
-assistant like Claude Code, and paste the JSON it returns back in.
+The Source and Screen steps are meant for an assistant, but not for a particular
+one. The pipeline renders the operating prompt, **you** run it wherever you like,
+and paste back the JSON it returns. ChatGPT, Gemini, Perplexity and Claude all
+work, and so does reading the prompt and doing the searching yourself.
 
 **Source — find one new project:**
 
 ```bash
-# 1. Print the Source prompt (already excludes projects you've collected):
-python -m pipeline.cli source-prompt
-# 2. Paste it into Claude Code (it web-searches and ends with one JSON object).
-# 3. Ingest that JSON:
-python -m pipeline.cli source-add --json -   # then paste the JSON, Ctrl-D
-#    (or save it to lead.json and: source-add --json lead.json)
+python3 scoreboard.py source-prompt          # prints it; already excludes what you have
+# run it in an assistant that can search the web; it ends with one JSON object
+python3 scoreboard.py source-add --json -    # paste the JSON, then Ctrl-D
 ```
 
 **Screen — extract the row for a lead:**
 
 ```bash
-python -m pipeline.cli screen-prompt --source-id 7   # prints the prompt w/ the links
-# run it in Claude Code, then:
-python -m pipeline.cli screen-add --json row.json --source-id 7
-python -m pipeline.cli screen-check --id 11
+python3 scoreboard.py screen-prompt --source-id 7   # the prompt, with the links filled in
+# run it, then:
+python3 scoreboard.py screen-add --json row.json --source-id 7
+python3 scoreboard.py screen-check --id 11
 ```
 
-In the **web app** the same flow is a button: Source → "Show Source prompt to
-run" (copy, run in Claude Code, paste JSON → "Ingest lead JSON"); Screen → enter
-a Source id → "Show Screen prompt to run" → paste the row JSON.
+In the web app the same flow is a button: Source → "Show Source prompt to run"
+(copy, run it, paste the JSON into "Ingest lead JSON"); Screen → enter a Source
+id → "Show Screen prompt to run" → paste the row JSON.
 
-> The direct-API path (`source-collect` / `screen-extract` / `tools/gather.py`) does the
-> same thing automatically via the Anthropic Messages API with the web-search +
-> web-fetch tools and a JSON-Schema structured-output call — but it needs
-> `ANTHROPIC_API_KEY`. The Claude Code path above needs no key.
+> The direct-API path (`source-collect`, `screen-extract`, `tools/gather.py`)
+> does the same thing automatically through the Anthropic Messages API, using the
+> web-search and web-fetch tools and a JSON-Schema structured-output call. It
+> needs `ANTHROPIC_API_KEY`. The path above needs nothing.
 
-
-### A little test (offline, no key, on a copy of the database)
+## A walkthrough on a copy of the database
 
 Everything below reads and writes a **copy**, so the committed database is
 untouched. From `aici/scoreboard`:
@@ -160,34 +168,41 @@ python3 scoreboard.py --db /tmp/try.db screen-list
 # 2. Act as the human gate: publish a row that passed its check
 python3 scoreboard.py --db /tmp/try.db verify-promote --screen-id 42 --tier V1 \
     --flag "Resolved: two independent sources agree on the announced date."
+#   -> promoted screen #42 -> verify_verified #34 (tier V1)
 
-# 3. Correct it -- the change is logged with its reason
+# 3. Correct it; the change is logged with its reason
 python3 scoreboard.py --db /tmp/try.db verify-edit --id 34 \
     --set current_status="AT VOLUME (corrected)" \
     --desc "Tightened status wording after re-reading the release."
 python3 scoreboard.py --db /tmp/try.db verify-show --id 34
 #   -> the row PLUS an "edit history" line from verify_edits
 
-# 4. Try to publish the same project twice -- the gate refuses
+# 4. Try to publish the same project twice; the gate refuses
 python3 scoreboard.py --db /tmp/try.db verify-promote --screen-id 42 --tier V1
 #   -> promotion blocked: project already in verify_verified
 
 rm /tmp/try.db
 ```
 
-**Expected:** the promote succeeds, the second one is blocked, and `verify-show`
+**Expected:** the promote succeeds, the second is blocked, and `verify-show`
 prints the edited value with one edit-history entry.
 
-Starting from an **empty** database instead works the same way, except there is
-nothing to promote yet: `verify-list` will tell you what to run to collect and
-extract some rows first.
+The same four steps are available guided, which prints each row's figures and
+both source links and asks about them one at a time:
+
+```bash
+python3 scoreboard.py --db /tmp/try.db review
+```
+
+Starting from an **empty** database works the same way, except there is nothing
+to promote yet, and the CLI tells you what to run to collect some rows first:
 
 ```bash
 python3 scoreboard.py --db /tmp/empty.db initdb
 python3 scoreboard.py --db /tmp/empty.db verify-list
 ```
 
-Then start the web app (`python3 scoreboard.py webapp`) and click through
-the same steps, ending on a Verify detail page to try the edit form.
+Then start the web app (`python3 scoreboard.py webapp`) and click through the
+same steps, ending on a Verify detail page to try the edit form.
 
 ---
