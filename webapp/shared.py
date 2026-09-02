@@ -1,0 +1,238 @@
+"""
+shared.py -- the pieces every page needs: the stylesheet, the page skeleton, the
+database picker, and the small formatting helpers.
+
+No routes and no app live here, so every page module can import it without a
+circular reference. The dependency runs one way: shared <- the page modules <-
+main.
+"""
+
+from __future__ import annotations
+
+import html
+import json
+import os
+import sys
+
+# webapp/ -> scoreboard/, so `pipeline` imports resolve
+# whether this is run as a package or by path.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from fastapi.responses import HTMLResponse  # noqa: E402
+
+from pipeline import source, screen, verify, orchestrate as orch, llm  # noqa: E402
+from pipeline.db import (  # noqa: E402
+    connect, db_path, discover_databases, init_db, is_read_only, set_active_db,
+    table_counts,
+)
+from pipeline.dates import lag_label  # noqa: E402
+from pipeline.schema_check import (  # noqa: E402
+    V0_COLUMNS,
+    DERIVED_DATE_COLUMNS,
+    RAW_DATE_COLUMNS,
+    all_sectors,
+    register_sector,
+)
+from pipeline.llm import LLMUnavailable  # noqa: E402
+
+
+def _conn():
+    return connect()
+
+
+# --------------------------------------------------------------------------- #
+# HTML helpers                                                                 #
+# --------------------------------------------------------------------------- #
+
+_CSS = """
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { font: 15px/1.5 system-ui, sans-serif; margin: 0; padding: 0 1.5rem 4rem;
+       max-width: 1000px; margin-inline: auto; }
+h1 { font-size: 1.4rem; } h2 { font-size: 1.1rem; margin-top: 2rem;
+     border-bottom: 1px solid #8884; padding-bottom: .3rem; }
+nav a { margin-right: 1rem; text-decoration: none; font-weight: 600; }
+.stages { display: grid; grid-template-columns: repeat(5, 1fr); gap: .5rem;
+         text-align: center; margin: 1rem 0; }
+.stages div { border: 1px solid #8886; border-radius: 8px; padding: .6rem; }
+.stages .n { font-size: 1.6rem; font-weight: 700; }
+.card { border: 1px solid #8885; border-radius: 8px; padding: .8rem 1rem;
+        margin: .6rem 0; }
+.card small { color: #8889; }
+form.inline { display: inline; }
+label { display: block; margin: .4rem 0 .1rem; font-size: .85rem; color: #8889; }
+input[type=text], textarea, select { width: 100%; padding: .35rem .5rem;
+    border: 1px solid #8887; border-radius: 6px; background: transparent;
+    color: inherit; font: inherit; }
+textarea { font-family: ui-monospace, monospace; font-size: .82rem; }
+button { padding: .35rem .8rem; border: 1px solid #8887; border-radius: 6px;
+    background: #6663; color: inherit; cursor: pointer; font: inherit; }
+button.primary { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
+.msg { background: #2b6cb022; border: 1px solid #2b6cb066; padding: .6rem 1rem;
+       border-radius: 6px; margin: 1rem 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .3rem .8rem; }
+.verdict-FAIL { color: #c0392b; font-weight: 700; }
+.verdict-PASS { color: #b7791f; font-weight: 700; }
+.verdict-CLEAN { color: #2f855a; font-weight: 700; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+td, th { border: 1px solid #8884; padding: .25rem .4rem; text-align: left; }
+code { background: #8882; padding: 0 .2rem; border-radius: 3px; }
+.pill { display: inline-block; font-size: .72rem; padding: .05rem .45rem;
+        border-radius: 999px; border: 1px solid #8886; vertical-align: middle; }
+.pill.todo { background: #b7791f22; border-color: #b7791f66; }
+.pill.done { background: #2f855a22; border-color: #2f855a66; }
+.toggle { display: flex; flex-wrap: wrap; gap: .3rem; margin: .6rem 0; }
+.toggle a { text-decoration: none; color: inherit; font-size: .85rem;
+    padding: .25rem .7rem; border: 1px solid #8887; border-radius: 6px; }
+.toggle a.on { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
+.dbbar { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+    margin: .75rem 0 1rem; padding: .5rem .7rem; border: 1px solid #8886;
+    border-radius: 8px; font-size: .85rem; }
+.dbbar label { font-weight: 600; }
+.dbbar select { font-size: .85rem; padding: .2rem; max-width: 26rem; }
+.dbbar small { color: #8889; font-family: ui-monospace, monospace; }
+.dbbar .ro { background: #b45309; color: #fff; border-radius: 4px;
+    padding: .1rem .45rem; font-weight: 600; }
+.dbbar .rw { background: #15803d; color: #fff; border-radius: 4px;
+    padding: .1rem .45rem; font-weight: 600; }
+"""
+
+
+VOCABULARY = {
+    "renamed": "Source / Screen / Verify",
+    "legacy":  "Bronze / Silver / Gold (pre-rename)",
+    "empty":   "no tables yet",
+    "missing": "unreadable",
+}
+
+
+def _db_bar() -> str:
+    """The database picker: every scoreboard*.db under outputs/, one click to switch."""
+    current = db_path()
+    options = []
+    for d in discover_databases():
+        label = f"{d['rel']}  —  {VOCABULARY.get(d['flavour'], d['flavour'])}, {d['rows']} rows"
+        sel = " selected" if d["active"] else ""
+        options.append(f'<option value="{html.escape(str(d["path"]))}"{sel}>{html.escape(label)}</option>')
+    badge = ('<span class="ro">read-only</span>' if is_read_only()
+             else '<span class="rw">writable</span>')
+    return f"""<form class="dbbar" method="post" action="/db">
+<label for="dbsel">Database</label>
+<select id="dbsel" name="path">{''.join(options)}</select>
+<button type="submit">Switch</button>{badge}
+<small>{html.escape(str(current))}</small></form>"""
+
+
+def _page(title: str, body: str, msg: str | None = None) -> HTMLResponse:
+    banner = f'<div class="msg">{html.escape(msg)}</div>' if msg else ""
+    doc = f"""<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{html.escape(title)}</title><style>{_CSS}</style></head><body>
+<h1>Promised vs. Produced — Source → Verify Pipeline</h1>
+<nav><a href="/">Dashboard</a><a href="/source">Source</a>
+<a href="/screen">Screen</a><a href="/verify">Verify</a></nav>
+{_db_bar()}
+{banner}{body}</body></html>"""
+    return HTMLResponse(doc)
+
+
+def esc(v) -> str:
+    return html.escape("" if v is None else str(v))
+
+
+def _cell(row, col):
+    """Value of a column that may not exist on this row -- e.g. a database that
+    predates the *_raw / *_dt date columns and hasn't been re-init'd yet. Returns
+    None (rendered as blank) instead of raising IndexError on a sqlite3.Row."""
+    try:
+        return row[col]
+    except (IndexError, KeyError):
+        return None
+
+
+def _verdict_span(v: str | None) -> str:
+    v = v or "—"
+    cls = f"verdict-{v}" if v in ("FAIL", "PASS", "CLEAN") else ""
+    return f'<span class="{cls}">{esc(v)}</span>'
+
+
+# --------------------------------------------------------------------------- #
+# "What have I not moved down yet?" -- a purely presentational filter.         #
+# Both stages already carry their lineage FK (screen_extracted.source_collected_id,
+# verify_verified.screen_extracted_id), so backlog is a read of existing columns:  #
+# nothing here writes, and no schema/pipeline behaviour changes.               #
+# --------------------------------------------------------------------------- #
+
+SHOW_MODES = ("all", "pending", "done")
+
+# The chosen toggle is remembered per stage in a cookie, so it survives every
+# redirect the app does (add a lead, run a check, promote a row...) instead of
+# snapping back to "all" and making you re-click. Purely presentational: the
+# cookie only ever selects which rows are RENDERED.
+SHOW_COOKIE = {"/source": "pvp_show_source", "/screen": "pvp_show_screen"}
+SHOW_COOKIE_MAX_AGE = 60 * 60 * 24 * 365   # a year; it is a UI preference
+
+
+def _resolve_show(request: Request, stage: str, show: str | None) -> str:
+    """The toggle to render with.
+
+    An explicit `?show=` in the URL wins (that's the user clicking the toggle);
+    otherwise fall back to the remembered choice, then to "all"."""
+    if show in SHOW_MODES:
+        return show
+    remembered = request.cookies.get(SHOW_COOKIE[stage])
+    return remembered if remembered in SHOW_MODES else "all"
+
+
+def _remember_show(resp: HTMLResponse, stage: str, show: str) -> HTMLResponse:
+    resp.set_cookie(SHOW_COOKIE[stage], show,
+                    max_age=SHOW_COOKIE_MAX_AGE, samesite="lax")
+    return resp
+
+
+def _downstream_map(conn, table: str, fk: str) -> dict[int, list[int]]:
+    """{parent row id: [ids of the rows it produced in `table`]}.
+
+    A parent missing from this map has never been carried to the next stage.
+    Rows whose FK is NULL (seeded / hand-pasted, no lineage recorded) simply
+    contribute nothing -- they can't prove any parent was promoted.
+    """
+    out: dict[int, list[int]] = {}
+    for child_id, parent_id in conn.execute(
+        f"SELECT id, {fk} FROM {table} WHERE {fk} IS NOT NULL ORDER BY id"
+    ):
+        out.setdefault(int(parent_id), []).append(int(child_id))
+    return out
+
+
+def _keep(row_id: int, downstream: dict[int, list[int]], show: str) -> bool:
+    if show == "pending":
+        return row_id not in downstream
+    if show == "done":
+        return row_id in downstream
+    return True
+
+
+def _stage_toggle(path: str, show: str, labels: dict[str, str]) -> str:
+    return '<div class="toggle">' + "".join(
+        f'<a class="{"on" if show == mode else ""}" '
+        f'href="{path}?show={mode}">{lbl}</a>'
+        for mode, lbl in labels.items()
+    ) + "</div>"
+
+
+def _lineage_pill(row_id: int, downstream: dict[int, list[int]],
+                  next_stage: str, todo_label: str) -> str:
+    kids = downstream.get(row_id)
+    if kids:
+        ids = ", ".join(f"#{k}" for k in kids)
+        return f'<span class="pill done">→ {esc(next_stage)} {esc(ids)}</span>'
+    return f'<span class="pill todo">{esc(todo_label)}</span>'
+
+
+def _to_int(v) -> int | None:
+    try:
+        return int(str(v).replace(",", "").replace("$", "").strip())
+    except (ValueError, TypeError):
+        return None
+

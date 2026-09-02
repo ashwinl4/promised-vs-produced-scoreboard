@@ -1,0 +1,235 @@
+"""
+verify.py -- Verify stage operations (`verify_verified` + `verify_edits`).
+
+Verify is the published, research-grade scoreboard. A row only reaches here once a
+human (later: a verifier agent) has confirmed the two independent sources
+actually support the claims -- so verification_tier is V1 (one source per
+load-bearing cell) or V2 (two independent sources), never P. This
+promotion is the human gate: the whole point of the pipeline.
+
+Two invariants this module enforces (the Verify stage's whole purpose):
+  * `flag` is REWRITTEN on promotion into a "resolution record" (what was fixed
+    vs. what stays open), drawing on both Screen tables.
+  * Every UPDATE to a verify_verified row writes a verify_edits row in the SAME
+    transaction -- the audit log can never drift from the table it audits.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+
+from pipeline.db import now_iso
+from pipeline.dates import enrich as enrich_dates
+from pipeline.schema_check import (
+    V0_COLUMNS,
+    INT_COLUMNS,
+    DERIVED_DATE_COLUMNS,
+    RAW_DATE_COLUMNS,
+)
+from pipeline.screen import _coerce, row_to_v0_dict, latest_check, get_extracted
+
+# Tiers admissible on a published row -- P alone is never one of them.
+# V1 = confirmed against one source, V2 = against two independent sources.
+VERIFY_TIERS = {"V1", "V2", "V1/P", "V2/P", "V1/V2"}
+
+# Derived cells are computed by pipeline/dates.py from the date strings -- never
+# hand-edited, so they can't drift from the strings they summarise.
+DERIVED_FIELDS = {"lag_years", "slip_years"} | set(DERIVED_DATE_COLUMNS)
+DATE_STRING_COLUMNS = {"announced", "promised_first_output", "actual_first_output"}
+
+# Columns a human may edit on a Verify row (identity/lineage AND derived excluded).
+EDITABLE_COLUMNS = [c for c in V0_COLUMNS if c not in DERIVED_FIELDS]
+
+
+class PromotionBlocked(Exception):
+    """Raised when a screen row cannot be promoted (e.g. its check FAILs)."""
+
+
+def promote(
+    conn: sqlite3.Connection,
+    screen_extracted_id: int,
+    verification_tier: str,
+    flag: str | None = None,
+    overrides: dict | None = None,
+    force: bool = False,
+) -> int:
+    """Promote a screen_extracted row to verify_verified. Returns the new verify id.
+
+    This is the human gate. By default a row may only be promoted if its most
+    recent screen_check is PASS or CLEAN (structurally admissible); a FAIL blocks
+    promotion unless `force=True`.
+
+    * `verification_tier` must be a verified tier (V1/V2, optionally slash-P).
+    * `flag` becomes the Verify row's resolution record; if omitted, a default
+      resolution note is written -- `flag` is always rewritten on promotion.
+    * `overrides` lets the human correct individual cells at the moment of
+      promotion (e.g. fix an `announced` date the checker flagged).
+    """
+    tier = (verification_tier or "").strip()
+    if tier not in VERIFY_TIERS:
+        raise ValueError(
+            f"verify tier must be one of {sorted(VERIFY_TIERS)} (got {tier!r})"
+        )
+
+    src = get_extracted(conn, screen_extracted_id)
+    if src is None:
+        raise ValueError(f"no screen_extracted row with id {screen_extracted_id}")
+
+    chk = latest_check(conn, screen_extracted_id)
+    if chk is None and not force:
+        raise PromotionBlocked(
+            f"screen row {screen_extracted_id} has no screen_check yet -- "
+            "run the check first, or promote with force=True"
+        )
+    if chk is not None and chk["result_status"] == "FAIL" and not force:
+        raise PromotionBlocked(
+            f"screen row {screen_extracted_id} FAILs its schema check "
+            f"({chk['n_errors']} error(s)) -- fix it or promote with force=True"
+        )
+
+    # Build the verify row from the screen cells, applying human overrides.
+    values = row_to_v0_dict(src)
+    # Carry the verbatim *_raw date cells (not part of the v0 shape) through to
+    # Verify unchanged -- they are provenance, so promotion never rewrites them.
+    for raw_col in RAW_DATE_COLUMNS:
+        values[raw_col] = src[raw_col] if raw_col in src.keys() else None
+    for k, v in (overrides or {}).items():
+        if k in V0_COLUMNS:
+            values[k] = _coerce(k, v)
+
+    values["verification_tier"] = tier
+
+    if flag is not None:
+        values["flag"] = flag.strip() or None
+    else:
+        # On promotion `flag` stops meaning "raw extraction problems" and
+        # starts meaning "what the human fixed vs. what is still open".
+        prior = (values.get("flag") or "").strip()
+        note = f"Resolved: human-verified and promoted from screen_extracted #{screen_extracted_id}"
+        if prior and not prior.lower().startswith(("none", "resolved", "n/a")):
+            note += f". Prior extraction flag: {prior[:120]}"
+        values["flag"] = note
+
+    # Coerce ints one more time in case an override arrived as text.
+    for c in INT_COLUMNS:
+        values[c] = _coerce(c, values.get(c))
+    # Recompute the derived *_dt + float lag/slip from the (possibly overridden)
+    # date strings, so Verify is standardized identically to Screen.
+    values = enrich_dates(values)
+
+    ts = now_iso()
+    all_cols = list(V0_COLUMNS) + list(DERIVED_DATE_COLUMNS) + list(RAW_DATE_COLUMNS)
+    cols = ["datetime", "created_at", "screen_extracted_id"] + all_cols
+    placeholders = ", ".join("?" for _ in cols)
+    params = [ts, ts, screen_extracted_id] + [values[c] for c in all_cols]
+
+    try:
+        cur = conn.execute(
+            f"INSERT INTO verify_verified ({', '.join(cols)}) VALUES ({placeholders})",
+            params,
+        )
+    except sqlite3.IntegrityError as e:
+        conn.rollback()
+        if "UNIQUE" in str(e).upper():
+            raise PromotionBlocked(
+                f"project {values.get('project')!r} is already in verify_verified "
+                "(one published row per project) -- edit the existing row instead"
+            ) from e
+        raise
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+def edit(
+    conn: sqlite3.Connection,
+    verify_verified_id: int,
+    changes: dict,
+    edit_description: str,
+) -> None:
+    """Apply an edit to a Verify row AND log it, atomically.
+
+    `changes` maps editable v0 columns to new values. `edit_description` is the
+    provenance note. The verify_verified.datetime (last-modified) is bumped, and a
+    verify_edits row is written in the same transaction -- the two always move
+    together.
+    """
+    if not edit_description or not edit_description.strip():
+        raise ValueError("edit_description is required (data provenance)")
+
+    row = conn.execute(
+        "SELECT * FROM verify_verified WHERE id = ?", (verify_verified_id,)
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"no verify_verified row with id {verify_verified_id}")
+
+    clean: dict[str, object] = {}
+    for col, val in changes.items():
+        if col in DERIVED_FIELDS:
+            raise ValueError(
+                f"{col!r} is derived (computed from the date strings) -- edit "
+                "announced / promised_first_output / actual_first_output instead"
+            )
+        if col not in EDITABLE_COLUMNS:
+            raise ValueError(f"{col!r} is not an editable Verify column")
+        clean[col] = _coerce(col, val)
+
+    # If a date string changed, recompute the derived *_dt + lag/slip from the
+    # merged row (current cells + this edit) so they never drift from the strings.
+    if DATE_STRING_COLUMNS & set(clean):
+        merged = {c: (clean[c] if c in clean else row[c]) for c in V0_COLUMNS}
+        enriched = enrich_dates(merged)
+        for c in ("announced_dt", "promised_first_output_dt",
+                  "actual_first_output_dt", "lag_years", "slip_years"):
+            clean[c] = enriched[c]
+
+    # Guard: an edit must not demote a Verify row back to provisional.
+    if "verification_tier" in clean:
+        tier = (clean["verification_tier"] or "")
+        if tier not in VERIFY_TIERS:
+            raise ValueError(
+                f"verification_tier on Verify must stay verified ({sorted(VERIFY_TIERS)})"
+            )
+
+    ts = now_iso()
+    try:
+        if clean:
+            set_clause = ", ".join(f"{c} = ?" for c in clean)
+            conn.execute(
+                f"UPDATE verify_verified SET {set_clause}, datetime = ? WHERE id = ?",
+                [*clean.values(), ts, verify_verified_id],
+            )
+        else:
+            conn.execute(
+                "UPDATE verify_verified SET datetime = ? WHERE id = ?",
+                (ts, verify_verified_id),
+            )
+        conn.execute(
+            """
+            INSERT INTO verify_edits (datetime, verify_verified_id, edit_description)
+            VALUES (?, ?, ?)
+            """,
+            (ts, verify_verified_id, edit_description.strip()),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def list_verified(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute("SELECT * FROM verify_verified ORDER BY id").fetchall()
+
+
+def get_verified(conn: sqlite3.Connection, verify_id: int) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM verify_verified WHERE id = ?", (verify_id,)
+    ).fetchone()
+
+
+def list_edits(conn: sqlite3.Connection, verify_verified_id: int | None = None) -> list[sqlite3.Row]:
+    if verify_verified_id is None:
+        return conn.execute("SELECT * FROM verify_edits ORDER BY id").fetchall()
+    return conn.execute(
+        "SELECT * FROM verify_edits WHERE verify_verified_id = ? ORDER BY id",
+        (verify_verified_id,),
+    ).fetchall()

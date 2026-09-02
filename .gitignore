@@ -1,0 +1,22 @@
+# Scoreboard-local ignores.
+#
+# Repo-wide rules live in the root .gitignore and already cover .DS_Store,
+# .venv/, __pycache__/, *.pyc and .env. Do not repeat them here; this file is
+# only for what is specific to the Scoreboard.
+#
+# The data product IS committed. outputs/scoreboard.db and the three CSV
+# exports beside it are what someone clones this directory for, so nothing
+# below may exclude them.
+
+# SQLite writes these beside the database while a transaction is open and
+# removes them on commit. They are never part of the data, and a stray one left
+# behind by a crashed run must not be committed.
+*.db-journal
+*.db-wal
+*.db-shm
+
+# The README tells you to copy the database before experimenting, because most
+# commands open it read-write. Those copies stay local. The canonical database
+# is the one exception.
+*.db
+!outputs/scoreboard.db
