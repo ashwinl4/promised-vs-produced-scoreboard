@@ -1,14 +1,14 @@
-# Collecting new projects (Part 2)
+# Collecting new projects
 
 *Directory: [`../collect/`](../collect/)*
 
-The ongoing harvest: shell loops that spawn fresh headless Claude Code workers to
+The ongoing collection: shell loops that spawn fresh headless Claude Code workers to
 find new projects and extract them into rows. The short version is in the
 [scoreboard README](../README.md#add-data); this is the full set of controls.
 
 *Directory: [`collect/`](../collect/) — `all.sh`, `source.sh`, `screen.sh`, `prompts/`*
 
-Where Part 1 was a one-off bulk load, this is the ongoing harvest: shell loops
+Where the bulk import was a one-off load, this is the ongoing collection: shell loops
 that spawn fresh headless Claude Code workers to find new projects and extract
 them. Bookkeeping is below; the full methodology is in
 [`prompts/README.md`](../collect/prompts/README.md)
@@ -63,7 +63,7 @@ in an earlier session.
 Run the stages separately (below) when you want to inspect the Source rows
 before extracting them.
 
-### Part 2a — PROMPT 1: discover NEW projects on the web → Source
+### `source.sh` — PROMPT 1: discover NEW projects on the web → Source
 
 `ADD` = rows to add.
 
@@ -71,9 +71,9 @@ before extracting them.
 ADD=25 bash collect/source.sh
 ```
 
-### Part 2b — PROMPT 2: extract Source → Screen
+### `screen.sh` — PROMPT 2: extract Source → Screen
 
-`ADD` = screen rows to add. Part 2b is the *same* loop as Part 2a, pointed at the
+`ADD` = screen rows to add. `screen.sh` is the *same* loop as `source.sh`, pointed at the
 extraction prompt and counting a different table, so this is a thin wrapper.
 
 ```bash

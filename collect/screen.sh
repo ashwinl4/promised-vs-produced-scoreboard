@@ -2,7 +2,7 @@
 #
 # screen.sh -- drive PROMPT 2 (Source -> Screen extraction).
 #
-# There is no second outer loop: Part 2b is the *same* loop as Part 2a, just
+# There is no second outer loop: this is the *same* loop as source.sh, just
 # pointed at the extraction prompt and counting a different table. So this is a
 # thin wrapper that sets those two defaults and hands off to
 # source.sh -- exactly the env-prefixed command you'd

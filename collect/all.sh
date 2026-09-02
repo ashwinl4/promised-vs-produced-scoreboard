@@ -3,7 +3,7 @@
 # all.sh -- run the Source stage and then the Screen stage for N
 # datapoints, in one command.
 #
-# Part 2a and Part 2b are the same outer loop pointed at different prompts and
+# source.sh and screen.sh are the same outer loop pointed at different prompts and
 # counting different tables, so the normal session is "collect N leads, then
 # extract N rows" -- two commands and a wait in between. This runs the pair
 # back-to-back and prints one before/after summary.

@@ -1,8 +1,8 @@
-# Part 3 — the pipeline
+# pipeline
 
-The Scoreboard itself: the five tables, the commands, and the human gate. Part 0,
-Part 2, the `tools/` scripts and the web app all write through this. If you only
-read one directory, read this one.
+The Scoreboard itself: the five tables, the commands, and the human gate.
+`collect/`, `tools/` and the web app all write through this. If you only read one
+directory, read this one.
 
 **Contents**
 

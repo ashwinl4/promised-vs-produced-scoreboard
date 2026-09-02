@@ -869,7 +869,7 @@ def _epilog(prog: str) -> str:
 
   {_H}try things on a copy{_H}
     cp outputs/scoreboard.db /tmp/try.db
-    {ENTRY} --db /tmp/try.db review       practise without touching the data
+    {ENTRY} --db /tmp/try.db review    practise on the copy
 
   {_H}get the data out, and measure it{_H}
     {ENTRY} export                        writes outputs/csv_tables/

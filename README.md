@@ -253,8 +253,8 @@ Each of the three pipeline directories has its own README.
 | Path | What it is |
 |---|---|
 | [`scoreboard.py`](scoreboard.py) | **The entry point.** A thin launcher for the pipeline CLI. |
-| [`pipeline/`](pipeline/) | **Part 3, the pipeline.** The five tables, the commands, the web interface, and the promotion gate. Parts 1 and 2 both write through it. Also holds `schema.py`, which defines the columns, the sector list, and the size floor. |
-| [`collect/`](collect/) | **Part 2, ongoing collection.** The loops that find new projects and extract them, and the prompts they hand to each worker. |
+| [`pipeline/`](pipeline/) | **The pipeline.** The five tables, the commands, and the promotion gate. `collect/`, `tools/` and the web app all write through it. Also holds `schema.py`, which defines the columns, the sector list, and the size floor. |
+| [`collect/`](collect/) | **Ongoing collection.** The loops that find new projects and extract them, and the prompts they hand to each worker. |
 | [`webapp/`](webapp/) | The browser interface, for reviewing rows against their sources and promoting them. |
 | [`tools/`](tools/) | Scripts for an existing database. Two are also CLI commands: `export` and `coverage`. The other two, bulk CSV load and batch collection over the API, stay scripts because they are rare and sharp. |
 | [`outputs/`](outputs/) | `scoreboard.db`, plus `csv_tables/` holding a flat CSV export of each stage. |

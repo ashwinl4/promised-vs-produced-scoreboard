@@ -61,7 +61,7 @@ Rows that clear the schema check land in Screen, ready for review.
 
 ## `gather.py` — batch collection over the API
 
-An alternative to the Part 2 shell loops: collects N Source leads and optionally
+An alternative to the `collect` command: collects N Source leads and optionally
 extracts some of them into Screen, in one run, through the Anthropic API rather
 than Claude Code workers.
 
@@ -74,7 +74,7 @@ Needs `ANTHROPIC_API_KEY`, either exported or in a `config.env` beside
 `scoreboard.py` (a real shell variable wins; the file is gitignored). It stops at
 Screen, like everything else that is not a person.
 
-The Claude Code path in Part 2 needs no API key and is the usual way to collect.
+The `collect` command needs no API key and is the usual way to collect.
 
 ## `coverage.py` — recall against a reference list
 

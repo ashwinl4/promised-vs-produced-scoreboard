@@ -1,6 +1,6 @@
-# Part 2 — collecting new projects
+# collect
 
-The ongoing harvest. Two shell loops that start fresh headless Claude Code
+The ongoing collection. Two shell loops that start fresh headless Claude Code
 workers: one finds new projects and files them into Source, the other extracts
 Source leads into Screen rows. Neither touches Verify, which is a human gate.
 
