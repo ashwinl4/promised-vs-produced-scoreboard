@@ -12,7 +12,7 @@ Claude Code paths and an offline test. Run everything from `aici/scoreboard`.
 | Run the pipeline core + CLI (source/screen/verify moves, checks) | **nothing** — Python 3.9+ stdlib | no |
 | Use the web interface (`webapp`) | `pip install -r pipeline/requirements.txt` (FastAPI + uvicorn) | no |
 | **Claude Code path** for the AI steps (recommended, no key) | nothing extra | **no** |
-| Direct-API AI steps (`source-collect` / `screen-extract` / `automate`) | `pip install anthropic` | yes (`ANTHROPIC_API_KEY`) |
+| Direct-API AI steps (`source-collect` / `screen-extract` / `tools/gather.py`) | `pip install anthropic` | yes (`ANTHROPIC_API_KEY`) |
 
 Run every command **from the `scoreboard/` directory**, e.g.
 
@@ -38,7 +38,7 @@ Each stage is a small module the two interfaces share:
   `FAIL / PASS / CLEAN` verdict + the issue list.
 - `verify.py` — `promote()` (the human gate) and `edit()` (writes a `verify_edits`
   row in the **same transaction** as every Verify update).
-- `orchestrate.py` — the moves between the stages (`automate_all`, the AI runners, the explore-`filter`).
+- `orchestrate.py` — the moves between the stages (the AI runners, the explore-`filter`).
 - `dates.py` — the deterministic date standardization. Each date is kept as a
   **`*_raw` → token → `*_dt`** chain: the extractor supplies the verbatim source text
   (`*_raw`) and a clean normalized token; this module resolves the *token* to a `*_dt`
@@ -78,7 +78,7 @@ python -m pipeline.cli verify-show --id N                 # row + edit history
 python -m pipeline.cli verify-list
 
 # End-to-end (direct API)
-python -m pipeline.cli automate --n 3 [--auto-promote --tier V1]
+python3 tools/gather.py --n-source 10 --n-screen 3
 
 # Explore thresholds beyond the fixed floor (a plain SQL query; AND/OR)
 python -m pipeline.cli filter --capital 1000000000 --jobs 2000 --op OR --stage verify
@@ -101,7 +101,7 @@ python3 scoreboard.py webapp --reload --port 8100
 ```
 
 Server-rendered HTML, plain forms, no JS build step. The dashboard shows the five
-stage counts and the automate panel; the Source and Screen pages carry all
+stage counts and the database picker; the Source and Screen pages carry all
 three paths (manual / Claude Code / API); the **Verify** pages are the point of
 emphasis — promoting a passing Screen row is the human gate, and each Verify row
 has a full 17-field edit form whose saves are recorded in `verify_edits` with a
@@ -138,7 +138,7 @@ In the **web app** the same flow is a button: Source → "Show Source prompt to
 run" (copy, run in Claude Code, paste JSON → "Ingest lead JSON"); Screen → enter
 a Source id → "Show Screen prompt to run" → paste the row JSON.
 
-> The direct-API path (`source-collect` / `screen-extract` / `automate`) does the
+> The direct-API path (`source-collect` / `screen-extract` / `tools/gather.py`) does the
 > same thing automatically via the Anthropic Messages API with the web-search +
 > web-fetch tools and a JSON-Schema structured-output call — but it needs
 > `ANTHROPIC_API_KEY`. The Claude Code path above needs no key.

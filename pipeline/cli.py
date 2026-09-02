@@ -2,8 +2,7 @@
 cli.py -- the command-line interface to the medallion pipeline.
 
 This is the initialisation point of the pipeline from a terminal. Every step is
-here, each (where the stage allows it) offering a manual OR computational path,
-plus an `automate` command that runs a lead all the way to Verify.
+here, each (where the stage allows it) offering a manual OR computational path.
 
 Run it from the scoreboard directory. `scoreboard.py` is the documented entry
 point and is a thin launcher for this file:
@@ -673,24 +672,6 @@ def cmd_filter(conn, args):
     print(f"\n{len(rows)} row(s) match.")
 
 
-# --- Automate -------------------------------------------------------------- #
-
-def cmd_automate(conn, args):
-    results = orch.automate_all(
-        conn, n=args.n, auto_promote=args.auto_promote, promote_tier=args.tier
-    )
-    for i, res in enumerate(results):
-        print(f"--- lead {i + 1} ---")
-        if "error" in res:
-            print(f"  ERROR: {res['error']}")
-            continue
-        print(f"  source #{res['source_id']} -> screen #{res['screen_id']}  "
-              f"check={res['check']['result_status']}")
-        if "verify_id" in res:
-            print(f"  verify: {res.get('verify_note')}  "
-                  + (f"(#{res['verify_id']})" if res["verify_id"] else ""))
-
-
 # --------------------------------------------------------------------------- #
 # Argument parsing                                                            #
 # --------------------------------------------------------------------------- #
@@ -879,7 +860,7 @@ def _epilog(prog: str) -> str:
   {_H}collect over the API (needs ANTHROPIC_API_KEY){_H}
     {ENTRY} source-collect                one new lead from the web
     {ENTRY} screen-extract --source-id 12 that lead into a row
-    {ENTRY} automate --n 5                five leads, Source to Screen
+    python3 tools/gather.py --n-source 10 --n-screen 3   many at once
 
   {_H}collect automatically (the usual path; needs the claude CLI){_H}
     {ENTRY} collect --n 5 --dry-run       the plan, spending nothing
@@ -888,7 +869,7 @@ def _epilog(prog: str) -> str:
 
   {_H}try things on a copy{_H}
     cp outputs/scoreboard.db /tmp/try.db
-    {ENTRY} --db /tmp/try.db automate --n 3 --auto-promote
+    {ENTRY} --db /tmp/try.db review       practise without touching the data
 
   {_H}get the data out, and measure it{_H}
     {ENTRY} export                        writes outputs/csv_tables/
@@ -1018,8 +999,8 @@ def _command_examples() -> dict:
 {_H}the other three ways in{_H}
   This is the only path that needs Claude Code. source-prompt prints the
   same instructions for any assistant that can search the web, source-add
-  takes a row you wrote yourself, and automate uses the Anthropic API
-  directly. All four write the same rows through the same checks.
+  takes a row you wrote yourself, and source-collect uses the Anthropic API
+  directly. All of them write the same rows through the same checks.
 
   Every other knob (SOURCE_EFFORT, SCREEN_VERBOSE, MODEL, the SOURCE_ and
   SCREEN_ prefixes) still passes through the environment: docs/collecting.md
@@ -1151,16 +1132,6 @@ def _command_examples() -> dict:
 
   --op AND (the default) requires both thresholds; OR requires either.
   --stage screen queries rows before publication.
-""",
-        "automate": f"""{_H}examples{_H}
-  {ENTRY} automate --n 5      five leads, Source to Screen, checked
-  {ENTRY} --db /tmp/try.db automate --n 3 --auto-promote
-
-  Needs ANTHROPIC_API_KEY. The shell loops in
-  collect/ are the usual path and need no key.
-
-  --auto-promote writes rows into Verify without anyone reading them.
-  Point --db at a copy first.
 """,
         "source-prompt": f"""{_H}examples{_H}
   {ENTRY} source-prompt
@@ -1378,14 +1349,6 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--layer", dest="stage", choices=["verify", "screen"],
                    default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     s.set_defaults(fn=cmd_filter)
-
-    # Automate
-    s = sub.add_parser("automate", help="run leads Source->Screen->check [->Verify]")
-    s.add_argument("--n", type=int, default=1, help="number of leads (default 1)")
-    s.add_argument("--auto-promote", action="store_true",
-                   help="also promote passing rows to Verify (bypasses the human gate)")
-    s.add_argument("--tier", default="V1", help="tier for auto-promotion (default V1)")
-    s.set_defaults(fn=cmd_automate)
 
     # Attach the per-command examples. Done in one pass so that adding an
     # example above is the whole change, and a typo'd command name is caught

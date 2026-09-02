@@ -42,7 +42,7 @@ framework, so it works with the browser alone.
 
 | File | Holds |
 |---|---|
-| `main.py` | creates the app, mounts the three stage modules, and serves the dashboard plus the database picker and automate action |
+| `main.py` | creates the app, mounts the three stage modules, and serves the dashboard plus the database picker |
 | `shared.py` | the stylesheet, the page skeleton, the database picker bar, and the small formatting helpers every page uses |
 | `source.py` | the Source pages: the lead list, the rendered collection prompt, and the three ways to add a lead |
 | `screen.py` | the Screen pages: the row list, the extraction prompt, the checker, and the inspect view where a row is read against its sources |

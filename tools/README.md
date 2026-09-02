@@ -10,7 +10,7 @@ Two of them are also CLI commands, because they are things people do rather than
 maintenance: `python3 scoreboard.py export` and `python3 scoreboard.py coverage`.
 Same code either way, and both scripts still run on their own. The other two stay
 scripts: `load_csv.py` is rare and can write to Verify in bulk, and `gather.py`
-overlaps the `automate` command.
+is the batch driver for the direct-API path.
 
 **Contents**
 

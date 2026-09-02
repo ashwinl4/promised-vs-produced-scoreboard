@@ -2,11 +2,9 @@
 gather.py -- batch collection driver for the medallion pipeline via the direct
 Anthropic API (flavour B in llm.py), NOT Claude Code.
 
-The CLI's `automate` command runs leads one-for-one Source->Screen->check (and,
-optionally, straight to Verify). This file is the other shape the pipeline wants:
-gather *many* Source leads in one run, then extract only *some* of them into
-Screen -- because, as the spec puts it, it is completely fine (expected, even)
-for
+This is the batch shape the pipeline wants: gather *many* Source leads in one
+run, then extract only *some* of them into Screen -- because, as the spec puts
+it, it is completely fine (expected, even) for
 
     #source_collected  >>  #screen_extracted  >  #verify_verified
 

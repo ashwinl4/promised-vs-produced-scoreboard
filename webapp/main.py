@@ -114,50 +114,10 @@ def dashboard(request: Request, msg: Optional[str] = None):
   <div><div class="n">{c['verify_edits']}</div>Verify<br><small>edits</small></div>
 </div>
 
-<h2>Automate all the way to Verify (direct API)</h2>
-<div class="card">
-  <p>Runs each lead <code>Source → Screen → check</code> via the direct Anthropic
-  API (needs <code>ANTHROPIC_API_KEY</code>). Tick auto-promote to also push
-  passing rows into Verify — this <b>bypasses the human gate</b> and is meant for
-  the convenience/demo path only. No key? Use the per-step Claude Code prompts on
-  the Source and Screen pages instead.</p>
-  <form method="post" action="/automate">
-    <div class="grid2">
-      <div><label>How many leads</label><input type="text" name="n" value="1"></div>
-      <div><label>Auto-promote tier</label>
-        <select name="tier">
-          <option value="V1">V1 — checked against one source</option>
-          <option value="V2">V2 — two independent sources</option>
-        </select></div>
-    </div>
-    <label><input type="checkbox" name="auto_promote" value="1"> auto-promote passing rows to Verify</label>
-    <p><button class="primary" type="submit">Run automation</button></p>
-  </form>
-</div>
 """
     return _page("Dashboard", body, msg)
 
 
-@app.post("/automate")
-async def do_automate(request: Request):
-    form = await request.form()
-    try:
-        n = max(1, int(form.get("n") or 1))
-    except ValueError:
-        n = 1
-    auto = form.get("auto_promote") == "1"
-    tier = form.get("tier") or "V1"
-    conn = _conn()
-    try:
-        results = orch.automate_all(conn, n=n, auto_promote=auto, promote_tier=tier)
-    finally:
-        conn.close()
-    ok = sum(1 for r in results if "error" not in r)
-    errs = [r["error"] for r in results if "error" in r]
-    msg = f"Automated {ok}/{len(results)} leads."
-    if errs:
-        msg += " Errors: " + "; ".join(errs[:3])
-    return RedirectResponse(f"/?msg={html.escape(msg)}", status_code=303)
 
 
 

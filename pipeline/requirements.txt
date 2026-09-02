@@ -7,7 +7,7 @@ fastapi>=0.115,<1
 uvicorn[standard]>=0.30,<1
 python-multipart>=0.0.9,<1
 
-# The DIRECT-API AI flavour (source-collect / screen-extract / automate) needs
+# The DIRECT-API AI flavour (source-collect / screen-extract / tools/gather.py) needs
 # the Anthropic SDK and an ANTHROPIC_API_KEY. It is OPTIONAL: the Claude Code
 # path (source-prompt / screen-prompt) needs neither.
 anthropic>=0.116

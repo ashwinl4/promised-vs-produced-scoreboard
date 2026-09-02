@@ -8,7 +8,7 @@ a human is doing it:
   * Source and Screen pt-1 can be done manually (source.insert_lead /
     screen.insert_extracted) OR computationally (run_source_ai / run_screen_ai).
   * Screen pt-2 (the check) is always deterministic/computational.
-  * Verify promotion is the human gate (verify.promote) -- but `automate_*` exposes
+  * Verify promotion is the human gate (verify.promote), and nothing here
     an explicit, clearly-labelled auto-promote for the "all the way to verify"
     convenience option, which bypasses that gate on purpose.
 """
@@ -131,57 +131,3 @@ def run_screen_ai(conn: sqlite3.Connection, source_id: int) -> tuple[int, dict]:
     row = llm.extract_screen_row(lead)
     sid = screen.insert_extracted(conn, row, source_collected_id=source_id)
     return sid, row
-
-
-def automate_lead(
-    conn: sqlite3.Connection,
-    auto_promote: bool = False,
-    promote_tier: str = "V1",
-) -> dict:
-    """Run one lead all the way through: Source(AI) -> Screen(AI) -> check
-    [-> Verify, if auto_promote]. Returns a summary of what happened.
-    """
-    result: dict = {}
-    bid, lead = run_source_ai(conn)
-    result["source_id"] = bid
-    result["lead"] = lead
-
-    sid, row = run_screen_ai(conn, bid)
-    result["screen_id"] = sid
-    result["row"] = row
-
-    check = screen.run_check(conn, sid)
-    result["check"] = check
-
-    if auto_promote:
-        if check["result_status"] == "FAIL":
-            result["verify_id"] = None
-            result["verify_note"] = "not auto-promoted: check FAILed"
-        else:
-            try:
-                gid = verify.promote(conn, sid, verification_tier=promote_tier)
-                result["verify_id"] = gid
-                result["verify_note"] = (
-                    "AUTO-PROMOTED (human gate bypassed by --auto-promote)"
-                )
-            except verify.PromotionBlocked as e:
-                result["verify_id"] = None
-                result["verify_note"] = f"not promoted: {e}"
-    return result
-
-
-def automate_all(
-    conn: sqlite3.Connection,
-    n: int = 1,
-    auto_promote: bool = False,
-    promote_tier: str = "V1",
-) -> list[dict]:
-    """Run `n` leads end-to-end. Returns one summary dict per lead (failures
-    are captured, not raised, so a bad lead doesn't abort the batch)."""
-    out = []
-    for i in range(n):
-        try:
-            out.append(automate_lead(conn, auto_promote, promote_tier))
-        except Exception as e:  # capture and continue
-            out.append({"error": str(e), "index": i})
-    return out

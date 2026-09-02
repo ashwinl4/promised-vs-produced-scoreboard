@@ -189,7 +189,7 @@ coverage measure are standard-library Python with no provider anywhere.
 |---|---|---|---|
 | **manual** | `source-add`, `screen-add` | nothing | you and a browser |
 | **prompt** | `source-prompt`, `screen-prompt` | nothing, no key | **any assistant that can search the web** |
-| **direct API** | `source-collect`, `screen-extract`, `automate` | `ANTHROPIC_API_KEY` | Anthropic only |
+| **direct API** | `source-collect`, `screen-extract`, `tools/gather.py` | `ANTHROPIC_API_KEY` | Anthropic only |
 | **loops** | `collect` | the `claude` CLI, logged in | Claude Code only |
 
 The **prompt** row is the one worth knowing about. `source-prompt` prints text
@@ -200,7 +200,8 @@ and the operating prompts say nothing about which model is reading them.
 
 The two automated paths are the Anthropic-specific ones. They are faster, not
 more capable: all four write the same rows through the same functions and face
-the same schema check and the same human gate.
+the same schema check and the same human gate. Nothing reaches Verify without a
+person, by any route.
 
 Per-stage settings are in [`docs/collecting.md`](docs/collecting.md). The manual
 and copy-the-prompt paths are in [`docs/cli.md`](docs/cli.md).
