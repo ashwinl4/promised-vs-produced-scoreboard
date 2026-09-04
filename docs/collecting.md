@@ -1,18 +1,14 @@
 # Collecting new projects
 
-*Directory: [`../collect/`](../collect/)*
-
-The ongoing collection: shell loops that find new projects and extract them into
-rows, one per iteration. The short version is in the
-[scoreboard README](../README.md#add-data); this is the full set of controls.
-
 *Directory: [`collect/`](../collect/) — `all.sh`, `source.sh`, `screen.sh`, `prompts/`*
 
-Where the bulk import was a one-off load, this is the ongoing collection: shell loops
-that find new projects and extract them, one per iteration. Bookkeeping is
-below; the full methodology is in
-[`prompts/README.md`](../collect/prompts/README.md)
-and each `promptN_*.md` beside it.
+Where the [bulk import](../../reference/bulk-import-experiment/) was a one-off
+load, this is the ongoing collection: shell loops that find new projects and
+extract them into rows, one per iteration. The short version is in the
+[scoreboard README](../README.md#add-data); this is the full set of controls.
+Bookkeeping is below, and the full methodology is in
+[`prompts/README.md`](../collect/prompts/README.md) and each `promptN_*.md`
+beside it.
 
 **Before any run:** `cd` into the `scoreboard/` directory and
 make sure the `claude` CLI is logged in there (`claude` → `/login`, one-time). Each
