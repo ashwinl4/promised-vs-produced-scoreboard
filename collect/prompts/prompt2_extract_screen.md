@@ -45,16 +45,26 @@ you name the candidate in `flag` — never a sector name you coined, never an ed
    `promised_date_source`, if present) and read them.
 2. Produce the one JSON row in the shape the printed prompt specifies — each date as
    both a normalized **token** and its verbatim **`*_raw`** partner; digits only for
-   `promised_capital_usd` / `promised_jobs`; surface any problem in `flag` (`None`
-   if clean). Omit `lag_years`, `slip_years`, the `*_dt` columns, and
-   `verification_tier` — the pipeline derives/forces those.
+   `promised_capital_usd` / `promised_jobs`; surface any problem in `flag`. A clean
+   extraction **omits** `flag` — never write the word `None`, which is a missing value
+   that reads as a present one. Same for any other cell you have nothing for. Omit
+   `lag_years`, `slip_years`, the `*_dt` columns, and `verification_tier` — the
+   pipeline derives/forces those.
 3. Ingest and check with the real commands:
    ```
    python3 -m pipeline.cli screen-add --json scratch/row.json --source-id N
    python3 -m pipeline.cli screen-check --id <new screen id>
    ```
    Read the verdict. If it FAILs on something the sources let you fix, correct the
-   JSON and re-add. No smoke testing beyond running the check.
+   JSON and re-add **with `--replace`**:
+   ```
+   python3 -m pipeline.cli screen-add --json scratch/row.json --source-id N --replace
+   ```
+   A plain re-add is refused, and that refusal is deliberate: without it the last run
+   left two rows for one project, both counted, with no way to delete either. One
+   Source lead is one Screen row. Never `screen-remove` — that is a human command.
+
+   No smoke testing beyond running the check.
 
 Everything at this stage is provisional (`verification_tier = P`). Verify promotion is
 a separate **human** gate and is **not** part of this prompt.

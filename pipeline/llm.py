@@ -70,14 +70,23 @@ class LLMUnavailable(RuntimeError):
 # Prompt builders (no API, no key -- for the Claude Code path AND flavour B)   #
 # --------------------------------------------------------------------------- #
 
+# Reading a source that will not load is the same problem at both stages, so the
+# procedure is written once and appended to both operating prompts. Keeping it in
+# one file is the point: the last run rediscovered the same curl invocation six
+# times, with six different user agents, because nothing told it the answer.
+_FETCH_LADDER = "fetching.md"
+
+
 def _operating_prompt(filename: str) -> str:
     """Load a *_prompt.md and return the operating prompt (text below the first
-    horizontal rule; the preamble above it is guidance for us, not the model)."""
+    horizontal rule; the preamble above it is guidance for us, not the model),
+    with the shared fetch ladder appended."""
     text = (_PROMPT_DIR / filename).read_text(encoding="utf-8")
     marker = "\n---\n"
     if marker in text:
-        return text.split(marker, 1)[1].strip()
-    return text.strip()
+        text = text.split(marker, 1)[1]
+    ladder = (_PROMPT_DIR / _FETCH_LADDER).read_text(encoding="utf-8").strip()
+    return text.strip() + "\n\n" + ladder
 
 
 def render_source_prompt(

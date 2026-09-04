@@ -46,7 +46,7 @@ the originating Source row's id, include it as `source_collected_id` for lineage
 | `notes` | Free-text context (caveats, renegotiations, related events). Optional but useful. |
 | `promise_source` | The URL(s) from the Source lead backing the promise. Multiple allowed, separated by `;` or spaces. |
 | `status_source` | The URL(s) backing the current status. |
-| `flag` | Extraction problems / discrepancies (see below). Use `None` if the row extracted cleanly. |
+| `flag` | Extraction problems / discrepancies (see below). Omit the key if the row extracted cleanly — never the word `None`. |
 | `promised_date_source` | Optional URL specifically supporting the promised date, if provided by the lead. |
 
 ## Date interpretation — the `*_raw` → token → `*_dt` chain, and how lag/slip are standardized
@@ -109,7 +109,11 @@ just recorded:
 - A **discrepancy** between sources, or between a source and the lead → state it plainly
   (e.g. "announcement is dated 2019-03-27, not 2019-01"). Surface contradictions; do not
   silently pick a side.
-- Clean extraction → `None`.
+- Clean extraction → **omit the key entirely**, or give it an empty string. Do not
+  write the word `None`, `null`, or `n/a`: that is a missing value wearing the
+  costume of a present one, and every check downstream reads it as real content.
+  The same goes for any other cell you have nothing for — `promised_date_source`
+  with no separate document is omitted, not filled in with `None`.
 
 ## Principles
 
@@ -144,7 +148,11 @@ tier to `P`. Example shape:
   "notes": "Workforce ramp delays reported 2023–2025.",
   "promise_source": "https://…",
   "status_source": "https://…",
-  "flag": "None",
+  "flag": "promise_source 403s to WebFetch; read via web.archive.org snapshot",
   "promised_date_source": "https://…"
 }
 ```
+
+`flag` is shown here carrying a real value, because that is the case worth seeing. A
+clean extraction leaves the key out altogether. Return only JSON — no comments, no
+trailing commas, nothing outside the object.
