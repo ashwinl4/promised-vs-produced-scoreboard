@@ -83,6 +83,23 @@ python3 scoreboard.py --help             # every command
 
 Those read only. Every command that writes is named as such below.
 
+**On the name `python3`.** Every command here spells it `python3`, because on
+Unix that name is guaranteed to mean Python 3, while a bare `python` may be
+missing or may be Python 2. Nothing in the pipeline depends on the spelling —
+if your system keeps the right interpreter somewhere else, under conda or pyenv
+or a distribution that ships only `python`, use that name instead.
+`./scoreboard.py` works too, and names no interpreter at all.
+
+What does matter is the version, **3.9 or newer**. `scoreboard.py` checks at the
+door and says so, rather than failing later from somewhere inside the code.
+
+The collection scripts resolve the interpreter once and take `PY=` as an
+override, alongside their other knobs:
+
+```bash
+PY=/opt/homebrew/bin/python3.12 bash collect/all.sh
+```
+
 ### 3. Run the web app — needs two packages
 
 ```bash

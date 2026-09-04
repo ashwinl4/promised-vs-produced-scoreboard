@@ -59,7 +59,7 @@ VERBOSE="${VERBOSE:-0}"   # 1 = stream tool calls/text live (JSON firehose)
 
 # --- Locate scoreboard/ and the tools --------------------------------- #
 cd "$(dirname "$0")/.."                            # collect/ -> scoreboard/
-PY="$(command -v python3 || command -v python)"
+PY="${PY:-$(command -v python3 || command -v python)}"
 CLAUDE="$(command -v claude || echo "$HOME/.local/bin/claude")"
 [ -x "$CLAUDE" ] || { echo "ERROR: claude CLI not found ($CLAUDE)"; exit 1; }
 

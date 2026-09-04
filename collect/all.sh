@@ -60,7 +60,7 @@ for f in "$SOURCE_LOOP" "$SCREEN_LOOP"; do
 done
 
 cd "$SCOREBOARD_ROOT"
-PY="$(command -v python3 || command -v python)"
+PY="${PY:-$(command -v python3 || command -v python)}"
 
 # --- Run transcript --------------------------------------------------------- #
 # Every run tees its own output to logs/. The transcript is the only record of

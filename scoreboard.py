@@ -19,6 +19,18 @@ from __future__ import annotations
 import os
 import sys
 
+# The pipeline needs 3.9 or newer. Say so here, in the first file anyone runs,
+# because the alternative is a TypeError from inside an annotation three
+# imports down that reads like a bug in the Scoreboard rather than a mismatch
+# in the interpreter. Nothing above this line is version-dependent.
+if sys.version_info < (3, 9):
+    sys.exit(
+        f"scoreboard.py needs Python 3.9 or newer; this is "
+        f"{sys.version.split()[0]} at {sys.executable}.\n"
+        "If a newer one is installed under another name, run that instead -- "
+        "nothing here depends on the spelling."
+    )
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pipeline.cli import main  # noqa: E402
