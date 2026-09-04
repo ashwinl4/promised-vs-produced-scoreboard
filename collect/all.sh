@@ -39,6 +39,7 @@
 #     e.g. SCREEN_MAX_STALL=5, SOURCE_MODEL=claude-sonnet-4-5, SCREEN_VERBOSE=1
 #
 #   Plus:
+#     LOG              transcript path; LOG=0 disables    (default logs/<utc>-collect.log)
 #     DRY_RUN=1        print the two commands and exit without calling Claude
 #     PREFLIGHT=0      skip the "is claude authenticated?" probe entirely
 #     CONTINUE_ON_FAIL=1  run Screen even if Source exited non-zero
@@ -60,6 +61,30 @@ done
 
 cd "$SCOREBOARD_ROOT"
 PY="$(command -v python3 || command -v python)"
+
+# --- Run transcript --------------------------------------------------------- #
+# Every run tees its own output to logs/. The transcript is the only record of
+# what a run actually did: which model and effort, how many turns, which
+# iterations failed, why it stopped. The database says what was collected but
+# not how, and for a corpus that will be cited, how is part of the claim.
+#
+# LOG=0 turns it off. LOG=<path> picks the file.
+#
+# LOG_ACTIVE is what stops a stage double-writing. all.sh already redirects its
+# own output through tee, and a stage it calls inherits that -- so if the stage
+# also opened the file, every line would be written twice: once through the
+# stage's tee and once through all.sh's. The parent sets LOG_ACTIVE, the child
+# sees it and skips its own redirect, and the lines still reach the file by
+# flowing up through the parent. Run a stage on its own and LOG_ACTIVE is unset,
+# so it opens its own transcript.
+LOG="${LOG:-}"
+if [ "$LOG" != "0" ] && [ -z "${LOG_ACTIVE:-}" ]; then
+  [ -n "$LOG" ] || LOG="logs/$(date -u +%Y%m%dT%H%M%SZ)-collect.log"
+  mkdir -p "$(dirname "$LOG")"
+  export LOG LOG_ACTIVE=1
+  exec > >(tee -a "$LOG") 2>&1
+fi
+
 
 # --- Config ---------------------------------------------------------------- #
 N="${N:-10}"
@@ -139,6 +164,7 @@ scr_before="$(count screen_extracted)"; scr_before="${scr_before:-0}"
 echo "database : $("$PY" -c 'from pipeline.db import db_path; print(db_path())')"
 echo "start    : source_collected=$src_before  screen_extracted=$scr_before"
 echo "plan     : ONLY=$ONLY  N=$N"
+[ "$LOG" != "0" ] && echo "log      : $LOG"
 
 # The authentication probe costs one Claude call, so run it in the FIRST stage
 # only and skip it in the second -- by then we already know the CLI works.

@@ -20,3 +20,10 @@
 # is the one exception.
 *.db
 !outputs/scoreboard.db
+
+# Run transcripts from collect/. A routine run is noise -- large, append-only,
+# and it changes every time, so committing them all would bury the diffs that
+# matter. The transcript of a run that produced PUBLISHED data is a different
+# thing: it is the provenance record for that corpus, and it gets allowlisted
+# here by name, the same way the canonical database is above.
+logs/*.log

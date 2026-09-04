@@ -101,7 +101,34 @@ count() { "$PY" -m pipeline.cli status | awk -v t="$COUNT_TABLE" '$0 ~ t {print 
 VERBOSE_FLAGS=()
 [ "$VERBOSE" = "1" ] && VERBOSE_FLAGS=(--verbose --output-format stream-json --include-partial-messages)
 
+
+# --- Run transcript --------------------------------------------------------- #
+# Every run tees its own output to logs/. The transcript is the only record of
+# what a run actually did: which model and effort, how many turns, which
+# iterations failed, why it stopped. The database says what was collected but
+# not how, and for a corpus that will be cited, how is part of the claim.
+#
+# LOG=0 turns it off. LOG=<path> picks the file.
+#
+# LOG_ACTIVE is what stops a stage double-writing. all.sh already redirects its
+# own output through tee, and a stage it calls inherits that -- so if the stage
+# also opened the file, every line would be written twice: once through the
+# stage's tee and once through all.sh's. The parent sets LOG_ACTIVE, the child
+# sees it and skips its own redirect, and the lines still reach the file by
+# flowing up through the parent. Run a stage on its own and LOG_ACTIVE is unset,
+# so it opens its own transcript.
+LOG="${LOG:-}"
+if [ "$LOG" != "0" ] && [ -z "${LOG_ACTIVE:-}" ]; then
+  [ -n "$LOG" ] || LOG="logs/$(date -u +%Y%m%dT%H%M%SZ)-${COUNT_TABLE}.log"
+  mkdir -p "$(dirname "$LOG")"
+  export LOG LOG_ACTIVE=1
+  exec > >(tee -a "$LOG") 2>&1
+fi
+
 START="$(count)"; START="${START:-0}"
+# One header line, so a transcript read on its own says when it ran and which
+# database it wrote to. all.sh prints these too; a stage run directly did not.
+echo "started : $(date -u +%Y-%m-%dT%H:%M:%SZ)  db=$("$PY" -c 'from pipeline.db import db_path; print(db_path())')"
 echo "loop: prompt=$PROMPT_FILE  add $ADD to $COUNT_TABLE (now $START)  (model=$MODEL, effort=$EFFORT)"
 
 stall=0
