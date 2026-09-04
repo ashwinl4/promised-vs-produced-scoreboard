@@ -51,15 +51,33 @@ case "$ADD" in
 esac
 MAX_ITERS="${MAX_ITERS:-$_iters_default}"         # cost cap on loop turns
 MAX_STALL="${MAX_STALL:-3}"                       # stop after this many no-progress iterations in a row
-MODEL="${MODEL:-claude-opus-4-8}"
-# NOTE: the print-mode `--effort` flag only accepts low|medium|high -- there is no
-# "extra high" from the CLI. `high` is the ceiling here.
-EFFORT="${EFFORT:-high}"
+# MODEL and EFFORT are resolved below, once $PY is known -- pipeline/models.py
+# holds the names and applies the SOURCE_MODEL / SCREEN_MODEL / MODEL
+# precedence, so the rule is written once instead of once per script.
+# NOTE: the print-mode `--effort` flag only accepts low|medium|high -- there is
+# no "extra high" from the CLI. `high` is the ceiling.
 VERBOSE="${VERBOSE:-0}"   # 1 = stream tool calls/text live (JSON firehose)
 
 # --- Locate scoreboard/ and the tools --------------------------------- #
 cd "$(dirname "$0")/.."                            # collect/ -> scoreboard/
 PY="${PY:-$(command -v python3 || command -v python)}"
+
+# Which stage this is -- needed before the model can be asked for. all.sh sets
+# it; a stage run on its own names itself from the table it counts.
+if [ -z "${STAGE_LABEL:-}" ]; then
+  case "$COUNT_TABLE" in
+    source_collected) STAGE_LABEL=SOURCE ;;
+    screen_extracted) STAGE_LABEL=SCREEN ;;
+    *)                STAGE_LABEL="$COUNT_TABLE" ;;
+  esac
+fi
+
+# The one place the model name lives. models.py reads SOURCE_MODEL /
+# SCREEN_MODEL / MODEL itself, so this asks for the answer rather than
+# re-deriving it -- there is no second copy of the precedence rule to drift.
+MODEL="$("$PY" -m pipeline.cli models --for "$STAGE_LABEL")"
+EFFORT="$("$PY" -m pipeline.cli models --for "$STAGE_LABEL" --effort)"
+
 CLAUDE="$(command -v claude || echo "$HOME/.local/bin/claude")"
 [ -x "$CLAUDE" ] || { echo "ERROR: claude CLI not found ($CLAUDE)"; exit 1; }
 
@@ -117,16 +135,6 @@ VERBOSE_FLAGS=(--output-format json)
 if [ "$VERBOSE" = "1" ]; then
   OUT_FORMAT=stream-json
   VERBOSE_FLAGS=(--verbose --output-format stream-json)
-fi
-
-# Which stage this is, for the by-stage line in the run summary. all.sh sets it;
-# a stage run on its own names itself from the table it counts.
-if [ -z "${STAGE_LABEL:-}" ]; then
-  case "$COUNT_TABLE" in
-    source_collected) STAGE_LABEL=SOURCE ;;
-    screen_extracted) STAGE_LABEL=SCREEN ;;
-    *)                STAGE_LABEL="$COUNT_TABLE" ;;
-  esac
 fi
 
 

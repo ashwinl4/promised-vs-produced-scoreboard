@@ -28,15 +28,20 @@
 #
 #     N            how many rows to add at each stage        (default 10)
 #     ONLY         source | screen | both                    (default both)
-#     MODEL        Claude model each iteration runs          (default claude-opus-4-8)
-#     EFFORT       low | medium | high                       (default high)
+#     MODEL        Claude model each iteration runs          (see below)
+#     EFFORT       low | medium | high                       (see below)
+#
+#   MODEL and EFFORT default from pipeline/models.py -- the one place the
+#   names live. `python3 scoreboard.py models` says what is in effect and
+#   what decided it. MODEL= on the command line changes every stage for one
+#   run; SOURCE_MODEL= / SCREEN_MODEL= change a single stage and win over it.
 #     MAX_ITERS    cost cap on loop turns per stage          (default 3x ADD)
 #     MAX_STALL    give up after N no-progress iterations    (default 3)
 #     VERBOSE      1 = stream tool calls                     (default 0)
 #     PROMPT_FILE  operating prompt for the stage            (per-stage defaults)
 #     COUNT_TABLE  table the stage counts                    (per-stage defaults)
 #
-#     e.g. SCREEN_MAX_STALL=5, SOURCE_MODEL=claude-sonnet-4-5, SCREEN_VERBOSE=1
+#     e.g. SCREEN_MAX_STALL=5, SOURCE_MODEL=claude-sonnet-5, SCREEN_VERBOSE=1
 #
 #   Plus:
 #     LOG              transcript path; LOG=0 disables    (default logs/<utc>-collect.log)
@@ -152,8 +157,11 @@ run_stage() {
   add="$(stage_cfg   "$stage" ADD         "$N")"
   prompt="$(stage_cfg "$stage" PROMPT_FILE "$default_prompt")"
   table="$(stage_cfg "$stage" COUNT_TABLE "$default_table")"
-  model="$(stage_cfg "$stage" MODEL       "claude-opus-4-8")"
-  effort="$(stage_cfg "$stage" EFFORT     "high")"
+  # Not stage_cfg: pipeline/models.py holds the names AND the
+  # SOURCE_MODEL / SCREEN_MODEL / MODEL precedence, so asking it keeps one
+  # implementation of that rule instead of a shell copy that can drift from it.
+  model="$("$PY" -m pipeline.cli models --for "$stage")"
+  effort="$("$PY" -m pipeline.cli models --for "$stage" --effort)"
   # Default scales with the rows asked for; see the note in source.sh. A flat
   # 200 here shadowed source.sh's own default, so N=300 capped at 200 silently.
   case "$add" in

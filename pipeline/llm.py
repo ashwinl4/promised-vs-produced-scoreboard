@@ -29,11 +29,16 @@ import json
 import os
 from pathlib import Path
 
+from pipeline import models
 from pipeline.schema_check import all_sectors, register_sector
 
 # Models newer than Opus 4.6 support the _20260209 web tools with dynamic
 # filtering; Opus 4.8 is the default for flavour B.
-MODEL = os.getenv("PIPELINE_MODEL", "claude-opus-4-8")
+# The model name lives in pipeline/models.py, once. models.api() still lets
+# PIPELINE_MODEL win -- that is the variable this path has always used -- but it
+# now also answers to the global MODEL, so "change the model everywhere" no
+# longer has an exception you have to know about.
+MODEL = models.api()
 EFFORT = os.getenv("PIPELINE_EFFORT", "high")
 
 _PROMPT_DIR = Path(__file__).resolve().parent / "prompts"

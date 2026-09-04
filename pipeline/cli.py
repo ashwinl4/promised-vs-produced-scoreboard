@@ -42,6 +42,7 @@ from pipeline import source, screen, verify, orchestrate as orch, llm  # noqa: E
 from pipeline.db import (  # noqa: E402
     DEFAULT_DB, TABLES, connect, db_path, init_db, table_counts,
 )
+from pipeline import models  # noqa: E402
 from pipeline.dates import enrich as enrich_dates  # noqa: E402
 from pipeline.schema_check import (  # noqa: E402
     V0_COLUMNS,
@@ -548,6 +549,30 @@ def cmd_screen_remove(conn, args):
         raise SystemExit(str(e))
     print(f"removed screen_extracted #{gone['id']} ({gone['project'] or 'no project name'})"
           f" and {gone['checks']} check(s)")
+
+
+def cmd_models(conn, args):
+    """Which model each stage will run, and what decided it.
+
+    The shell loops call this with --for to get their default, so the name
+    lives in pipeline/models.py and nowhere else. Before that it was pinned in
+    three files under two different environment variables, and changing "the
+    model" meant knowing all three and remembering which one was the exception.
+    """
+    if args.For:
+        stage = args.For.lower()
+        print(models.effort() if args.effort else getattr(models, stage)())
+        return
+    print("Model per stage        (edit pipeline/models.py to change)")
+    print("=" * 56)
+    for stage, (name, why) in models.in_effect().items():
+        print(f"  {stage:8} {name:24} <- {why}")
+    print(f"  {'effort':8} {models.effort():24} <- "
+          f"{'$EFFORT' if os.getenv('EFFORT') else 'models.py'}")
+    print()
+    print("For one run, without editing anything:")
+    print("  MODEL=claude-sonnet-5 bash collect/all.sh          every stage")
+    print("  SCREEN_MODEL=claude-sonnet-5 bash collect/all.sh   just Screen")
 
 
 def cmd_recompute(conn, args):
@@ -1435,6 +1460,15 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--yes", action="store_true", required=True,
                    help="required: this deletes a row, and there is no undo")
     s.set_defaults(fn=cmd_screen_remove)
+
+    s = sub.add_parser("models",
+                       help="which model each stage runs, and what decided it")
+    s.add_argument("--for", dest="For", choices=("source", "screen", "api",
+                                                 "SOURCE", "SCREEN", "API"),
+                   help="print just this stage's model, for the shell loops")
+    s.add_argument("--effort", action="store_true",
+                   help="with --for, print the reasoning effort instead")
+    s.set_defaults(fn=cmd_models)
 
     s = sub.add_parser("recompute",
                        help="re-derive lag/slip and the *_dt cells on stored rows")

@@ -66,7 +66,7 @@ after the script name. The flags above need none of that.
 
 **Per-stage config:** any knob below can be prefixed `SOURCE_` or `SCREEN_` to
 aim it at one stage; the prefixed value beats the shared one. So
-`MODEL=claude-sonnet-4-5 SCREEN_MODEL=claude-opus-4-8` runs discovery cheap and
+`MODEL=claude-sonnet-5 SCREEN_MODEL=claude-opus-4-8` runs discovery cheap and
 extraction strong.
 
 Also: the `claude` auth preflight runs **once** (not per stage), and a failing
