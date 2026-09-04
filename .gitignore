@@ -27,6 +27,10 @@
 # thing: it is the provenance record for that corpus, and it gets allowlisted
 # here by name, the same way the canonical database is above.
 logs/*.log
+# Beside each transcript: the per-iteration token ledger, and (VERBOSE=1)
+# the raw stream events. `logs/*.log` does not cover either -- they would
+# arrive untracked-but-not-ignored and get staged by a plain `git add`.
+logs/*.jsonl
 
 # Working files from collect/. Each run writes the lead or row it is about to
 # ingest as JSON, then calls source-add / screen-add on it. Once the command

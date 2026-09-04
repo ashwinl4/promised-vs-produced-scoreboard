@@ -40,6 +40,11 @@
 #
 #   Plus:
 #     LOG              transcript path; LOG=0 disables    (default logs/<utc>-collect.log)
+#                      Two machine files sit beside it, sharing its name:
+#                        <run>-usage.jsonl  the token ledger, one line per
+#                                           iteration -- always written
+#                        <run>.raw.jsonl    every raw stream event, and only
+#                                           under VERBOSE=1
 #     DRY_RUN=1        print the two commands and exit without calling Claude
 #     PREFLIGHT=0      skip the "is claude authenticated?" probe entirely
 #     CONTINUE_ON_FAIL=1  run Screen even if Source exited non-zero
@@ -84,6 +89,31 @@ if [ "$LOG" != "0" ] && [ -z "${LOG_ACTIVE:-}" ]; then
   export LOG LOG_ACTIVE=1
   exec > >(tee -a "$LOG") 2>&1
 fi
+
+# --- The other two files ---------------------------------------------------- #
+# The transcript is for reading, so it gets only what a human wants to read.
+# Two machine files sit beside it, named after the same run:
+#
+#   <run>-usage.jsonl  one result object per iteration. Both stages append to
+#                      this one file, which is what lets the summary at the end
+#                      report the whole run rather than the last stage of it.
+#   <run>.raw.jsonl    every raw stream event, VERBOSE=1 only -- the firehose.
+#                      It used to go into the .log itself, which is how a 20-row
+#                      run produced 6.5MB nobody could print.
+#
+# Exported, so the stages append here instead of opening their own pair. Same
+# parent-owns-it arrangement as LOG_ACTIVE just above. LOG=0 leaves the ledger
+# on a temporary file rather than skipping it: the summary still has to have
+# something to total, and a run that asked for no logs still asked for a total.
+if [ "$LOG" != "0" ]; then
+  USAGE_LEDGER="${LOG%.log}-usage.jsonl"
+  RAW_LOG="${LOG%.log}.raw.jsonl"
+else
+  USAGE_LEDGER="$(mktemp)"
+  RAW_LOG=""
+  trap 'rm -f "$USAGE_LEDGER"' EXIT
+fi
+export USAGE_LEDGER RAW_LOG
 
 
 # --- Config ---------------------------------------------------------------- #
@@ -144,7 +174,7 @@ run_stage() {
   echo "==================================================================="
 
   local cmd=(env -u PROMPT_FILE -u COUNT_TABLE
-    "ADD=$add" "PROMPT_FILE=$prompt" "COUNT_TABLE=$table"
+    "ADD=$add" "PROMPT_FILE=$prompt" "COUNT_TABLE=$table" "STAGE_LABEL=$stage"
     "MODEL=$model" "EFFORT=$effort" "MAX_ITERS=$iters"
     "MAX_STALL=$stall" "VERBOSE=$verbose" "PREFLIGHT=$preflight"
     bash "$script")
@@ -164,7 +194,11 @@ scr_before="$(count screen_extracted)"; scr_before="${scr_before:-0}"
 echo "database : $("$PY" -c 'from pipeline.db import db_path; print(db_path())')"
 echo "start    : source_collected=$src_before  screen_extracted=$scr_before"
 echo "plan     : ONLY=$ONLY  N=$N"
-[ "$LOG" != "0" ] && echo "log      : $LOG"
+if [ "$LOG" != "0" ]; then
+  echo "log      : $LOG                (readable)"
+  echo "usage    : $USAGE_LEDGER  (tokens per iteration)"
+  [ "${VERBOSE:-0}" = "1" ] && echo "raw      : $RAW_LOG   (every stream event)"
+fi
 
 # The authentication probe costs one Claude call, so run it in the FIRST stage
 # only and skip it in the second -- by then we already know the CLI works.
@@ -208,4 +242,17 @@ echo "  done"
 echo "    source_collected  $src_before -> $src_after  (+$(( src_after - src_before )))"
 echo "    screen_extracted  $scr_before -> $scr_after  (+$(( scr_after - scr_before )))"
 echo "==================================================================="
+
+# What the run spent. Both stages appended to one ledger, so this is the whole
+# run: total tokens, split by where they went and which model spent them.
+# --ledger-note names the ledger file, which is worth saying only when the
+# file will still be there afterwards. Under LOG=0 it is a temporary the trap
+# above deletes on the way out, so pointing at it would be an instruction to
+# open a path that no longer exists.
+NOTE_FLAG=()
+[ "$LOG" != "0" ] && NOTE_FLAG=(--ledger-note)
+"$PY" collect/tally.py --summary --ledger "$USAGE_LEDGER" \
+    ${NOTE_FLAG[@]+"${NOTE_FLAG[@]}"}
+
+echo
 "$PY" -m pipeline.cli status

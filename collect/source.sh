@@ -87,12 +87,41 @@ fi
 PROMPT="$(cat "$PROMPT_FILE")"
 count() { "$PY" -m pipeline.cli status | awk -v t="$COUNT_TABLE" '$0 ~ t {print $NF}'; }
 
-# Live-streaming flags (VERBOSE=1). stream-json requires --verbose in print mode.
+# --- How the CLI reports itself -------------------------------------------- #
+# Every `claude -p` call ends by reporting the tokens it spent and the models it
+# spent them on. The default `text` format prints the answer and throws that
+# report away, which is why a quiet run used to leave no accounting anywhere at
+# all -- not buried, absent. So always ask for a machine-readable result and
+# pipe it through collect/tally.py, which prints the readable part plus one line
+# of accounting.
+#
+#   quiet      --output-format json         one result object at the end
+#   VERBOSE=1  --output-format stream-json  live events, rendered compactly
+#
+# --include-partial-messages is deliberately NOT set under VERBOSE=1. It emits
+# every token twice -- once as a partial chunk, once in the finished block --
+# and was most of the 6.5MB that made the last run's log unprintable. The full
+# events still reach $RAW_LOG; tally.py renders a compact trace for the log.
+#
 # Expanded below as ${VERBOSE_FLAGS[@]+"${VERBOSE_FLAGS[@]}"} rather than plain
 # "${VERBOSE_FLAGS[@]}": under `set -u`, bash 3.2 (which macOS still ships)
 # treats an empty array expansion as an unbound variable and aborts.
-VERBOSE_FLAGS=()
-[ "$VERBOSE" = "1" ] && VERBOSE_FLAGS=(--verbose --output-format stream-json --include-partial-messages)
+OUT_FORMAT=json
+VERBOSE_FLAGS=(--output-format json)
+if [ "$VERBOSE" = "1" ]; then
+  OUT_FORMAT=stream-json
+  VERBOSE_FLAGS=(--verbose --output-format stream-json)
+fi
+
+# Which stage this is, for the by-stage line in the run summary. all.sh sets it;
+# a stage run on its own names itself from the table it counts.
+if [ -z "${STAGE_LABEL:-}" ]; then
+  case "$COUNT_TABLE" in
+    source_collected) STAGE_LABEL=SOURCE ;;
+    screen_extracted) STAGE_LABEL=SCREEN ;;
+    *)                STAGE_LABEL="$COUNT_TABLE" ;;
+  esac
+fi
 
 
 # --- Run transcript --------------------------------------------------------- #
@@ -117,6 +146,36 @@ if [ "$LOG" != "0" ] && [ -z "${LOG_ACTIVE:-}" ]; then
   export LOG LOG_ACTIVE=1
   exec > >(tee -a "$LOG") 2>&1
 fi
+
+# --- The other two files ---------------------------------------------------- #
+# The transcript above is for reading, so it gets only what a human wants to
+# read. Two machine files sit beside it:
+#
+#   <run>-usage.jsonl  one result object per iteration -- the accounting, kept
+#                      so a finished run can be re-totalled without re-running
+#   <run>.raw.jsonl    every raw stream event, VERBOSE=1 only. This is the
+#                      firehose. It used to go into the .log itself, which is
+#                      how a 20-row run produced 6.5MB nobody could print.
+#
+# LOG=0 still has to leave a ledger somewhere or the summary at the end would
+# have nothing to total, so it gets a temporary one and deletes it on the way
+# out. USAGE_LEDGER already set means all.sh owns these and both stages append
+# to the same pair -- the same parent-owns-it arrangement as LOG_ACTIVE.
+LEDGER_OWNER=0
+if [ -z "${USAGE_LEDGER:-}" ]; then
+  LEDGER_OWNER=1
+  if [ "$LOG" != "0" ]; then
+    USAGE_LEDGER="${LOG%.log}-usage.jsonl"
+    RAW_LOG="${LOG%.log}.raw.jsonl"
+  else
+    USAGE_LEDGER="$(mktemp)"
+    RAW_LOG=""
+    trap 'rm -f "$USAGE_LEDGER"' EXIT
+  fi
+  export USAGE_LEDGER RAW_LOG
+fi
+RAW_FLAGS=()
+[ "$VERBOSE" = "1" ] && [ -n "${RAW_LOG:-}" ] && RAW_FLAGS=(--raw "$RAW_LOG")
 
 START="$(count)"; START="${START:-0}"
 # One header line, so a transcript read on its own says when it ran and which
@@ -148,6 +207,9 @@ for i in $(seq 1 "$MAX_ITERS"); do
     --allowedTools "Bash Read Write WebSearch WebFetch" \
     --permission-mode acceptEdits \
     ${VERBOSE_FLAGS[@]+"${VERBOSE_FLAGS[@]}"} \
+    | "$PY" collect/tally.py --format "$OUT_FORMAT" \
+        --stage "$STAGE_LABEL" --iter "$i" --ledger "$USAGE_LEDGER" \
+        ${RAW_FLAGS[@]+"${RAW_FLAGS[@]}"} \
     || echo "  ! iteration $i failed; continuing."
 
   after="$(count)"; after="${after:-0}"
@@ -178,5 +240,15 @@ if [ "$hit_cap" = "1" ]; then
   echo "!! ==================================================================="
   echo
 fi
+
+# Only when this stage owns the ledger. Under all.sh the parent prints one
+# summary for both stages, and printing it here too would report the Source
+# stage's numbers as if they were the whole run.
+# --ledger-note only when the ledger outlives the run; under LOG=0 it is a
+# temporary the trap deletes, and naming it would point at nothing.
+NOTE_FLAG=()
+[ "$LOG" != "0" ] && NOTE_FLAG=(--ledger-note)
+[ "$LEDGER_OWNER" = "1" ] && "$PY" collect/tally.py --summary \
+    --ledger "$USAGE_LEDGER" ${NOTE_FLAG[@]+"${NOTE_FLAG[@]}"}
 
 echo "done. Final:"; "$PY" -m pipeline.cli status

@@ -224,6 +224,29 @@ person, by any route.
 Per-stage settings are in [`docs/collecting.md`](docs/collecting.md). The manual
 and copy-the-prompt paths are in [`docs/cli.md`](docs/cli.md).
 
+**What a run costs, and how you find out.** Every `claude` call reports the
+tokens it spent; `collect/all.sh` now reads that report instead of discarding
+it. Each iteration prints one line as it finishes, and the run ends with its
+totals — how many tokens, split by fresh input, cache read, cache write and
+output, and by which model spent them. The same text goes to the transcript, so
+a finished run can be read back later.
+
+Expect two models in that breakdown, not one. `MODEL=` names the one doing the
+pipeline work; the CLI picks its own for web search, and it spends real tokens
+under a name you did not choose.
+
+Three files per run, sharing one name:
+
+| file | what it holds |
+|---|---|
+| `logs/<run>-collect.log` | the readable transcript, including the token report |
+| `logs/<run>-usage.jsonl` | one result object per iteration, for re-totalling later |
+| `logs/<run>.raw.jsonl` | every raw stream event — `VERBOSE=1` only |
+
+`VERBOSE=1` used to put that third file's contents in the transcript itself,
+which is how a twenty-row run produced six megabytes nobody could read. The
+firehose now has its own file and the transcript stays printable.
+
 ---
 
 ## Publish a row
