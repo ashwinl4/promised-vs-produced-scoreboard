@@ -56,6 +56,7 @@ def screen_page(request: Request, msg: Optional[str] = None, show: Optional[str]
         promoted = _downstream_map(conn, "verify_verified", "screen_extracted_id")
         rows = [r for r in all_rows if _keep(r["id"], promoted, show)]
         checks = {r["id"]: screen.latest_check(conn, r["id"]) for r in rows}
+        queue = screen.review_queue(conn)
     finally:
         conn.close()
 
@@ -92,26 +93,61 @@ def screen_page(request: Request, msg: Optional[str] = None, show: Optional[str]
     example_keys += list(RAW_DATE_COLUMNS)
     example = json.dumps({c: "" for c in example_keys}, indent=1)
 
-    body = f"""
-<h2>Extract a row — Claude Code (no API key)</h2>
-<div class="card"><form method="get" action="/screen/prompt">
-  <label>Source lead id to extract</label><input type="text" name="source_id" required>
-  <p><button class="primary" type="submit">Show Screen prompt to run</button></p>
-</form></div>
+    # The review queue leads. It used to sit below "Extract a row" and "Add a row
+    # — paste JSON", so the page opened on the two things a person almost never
+    # does and buried the one thing that is actually waiting on them. The
+    # add-forms are still here, at the bottom, where a rarely-used tool belongs.
+    # Ask the same helper the dashboard and `status` ask, so the three cannot
+    # quote different numbers at the same person. n_pending counts rows not yet
+    # in Verify; some of those are blocked by a failing check and cannot be
+    # promoted at all, and saying so is the difference between a queue of 22 and
+    # an unexplained 23.
+    q = queue
+    n_ready, n_blocked = len(q["ready"]), len(q["blocked"])
+    if n_ready or n_blocked:
+        blocked_note = ""
+        if n_blocked:
+            links = ", ".join(f'<a href="/screen/{r["id"]}/inspect">#{r["id"]}</a>'
+                              for r in q["blocked"][:8])
+            blocked_note = (f" A further <b>{n_blocked}</b> cannot be promoted until a "
+                            f"failing check is fixed: {links}.")
+        lede = (f"<p><b>{n_ready} row(s) are waiting for you.</b> Open one, check "
+                "every field against the two sources, then promote it. Nothing "
+                "reaches the published Scoreboard until a person does this."
+                + blocked_note + "</p>")
+    else:
+        lede = ("<p>Nothing is waiting: every Screen row has been through the human "
+                "gate. <a href=\"/verify\">See the published rows</a>.</p>")
 
-<h2>Add a row — manual / paste JSON</h2>
-<div class="card"><form method="post" action="/screen/add">
-  <label>source_id (optional lineage)</label><input type="text" name="source_id">
-  <label>row JSON (v0 columns; verification_tier forced to P; lag/slip + *_dt derived)</label>
-  <textarea name="row_json" rows="8">{esc(example)}</textarea>
-  <p><button type="submit">Add row</button></p>
-</form></div>
+    body = f"""
+<h2>Review queue</h2>
+<div class="card">{lede}
+<p><small>Or work the same queue in a terminal, largest capital first:
+<code>python3 scoreboard.py review</code></small></p></div>
 
 <h2>Rows ({len(rows)} of {len(all_rows)})</h2>
 <p><form class="inline" method="post" action="/screen/check-all">
   <button type="submit">Run the deterministic check on all rows</button></form></p>
 {toggle}
 {items}
+
+<hr>
+<h2>Add rows by hand</h2>
+<p><small>Rarely needed — the collection loops fill this stage. Use these to
+extract a specific lead, or to paste a row you built yourself.</small></p>
+
+<div class="card"><form method="get" action="/screen/prompt">
+  <label>Extract a Source lead with Claude Code — lead id</label>
+  <input type="text" name="source_id" required>
+  <p><button type="submit">Show Screen prompt to run</button></p>
+</form></div>
+
+<div class="card"><form method="post" action="/screen/add">
+  <label>source_id (optional lineage)</label><input type="text" name="source_id">
+  <label>row JSON (v0 columns; verification_tier forced to P; lag/slip + *_dt derived)</label>
+  <textarea name="row_json" rows="8">{esc(example)}</textarea>
+  <p><button type="submit">Add row</button></p>
+</form></div>
 """
     return _remember_show(_page("Screen", body, msg), "/screen", show)
 

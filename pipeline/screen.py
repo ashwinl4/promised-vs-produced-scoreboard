@@ -239,6 +239,30 @@ def latest_check(conn: sqlite3.Connection, screen_extracted_id: int) -> sqlite3.
     ).fetchone()
 
 
+def review_queue(conn: sqlite3.Connection) -> dict:
+    """What is waiting for a person, and what is in the way.
+
+    Returns {"ready": [rows], "blocked": [rows], "published": int}. `ready` is
+    largest capital first, which is the order review is meant to proceed in: the
+    Scoreboard is made complete from the top down, so wherever review stops, the
+    claim above that point is intact. `blocked` is the rows whose deterministic
+    check FAILs -- promotion refuses those until the row is fixed.
+
+    Every surface that tells a human what to do next asks this, so `status`, the
+    bare-invocation landing page, the web dashboard and `review` itself cannot
+    quote different numbers at the same person on the same database.
+    """
+    published = {r["project"] for r in conn.execute(
+        "SELECT project FROM verify_verified")}
+    ready, blocked = [], []
+    for row in list_extracted(conn, by_capital=True):
+        if row["project"] in published:
+            continue
+        chk = latest_check(conn, row["id"])
+        (blocked if (chk and chk["result_status"] == "FAIL") else ready).append(row)
+    return {"ready": ready, "blocked": blocked, "published": len(published)}
+
+
 def list_extracted(conn: sqlite3.Connection,
                    by_capital: bool = False) -> list[sqlite3.Row]:
     """Screen rows, by id (insertion order) or largest capital first.

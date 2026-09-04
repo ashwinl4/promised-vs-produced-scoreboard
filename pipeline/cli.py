@@ -99,6 +99,54 @@ def cmd_status(conn, args):
     print(f"          screen_check      {counts['screen_check']:>4}")
     print(f"  VERIFY  verify_verified   {counts['verify_verified']:>4}")
     print(f"          verify_edits      {counts['verify_edits']:>4}")
+    _print_your_move(conn)
+
+
+def _print_your_move(conn) -> None:
+    """The line that says what the person reading this is supposed to do.
+
+    Five counts and nothing else assumes the reader already knows which of them
+    is waiting on them, which of them a machine will fill in, and what to type.
+    Nobody knows that on the first read, and the numbers alone never say it: 23
+    screened rows is excellent news or a 23-item backlog depending on a fact the
+    table does not show. So say it.
+    """
+    q = screen.review_queue(conn)
+    ready, blocked = q["ready"], q["blocked"]
+    colour = _use_colour()
+    cyan = (lambda t: f"{_ANSI['cyan']}{t}{_ANSI['off']}") if colour else (lambda t: t)
+    bold = (lambda t: f"{_ANSI['bold']}{t}{_ANSI['off']}") if colour else (lambda t: t)
+
+    print()
+    if not ready and not blocked:
+        if not q["published"]:
+            print("This database is empty. Collect some projects first:")
+            print(f"  N=5 bash {cyan('collect/all.sh')}")
+        else:
+            print(f"Nothing waiting for you. All {q['published']} project(s) "
+                  "have been through the human gate.")
+            print(f"  {ENTRY} {cyan('verify-list')}     what is published")
+            print(f"  N=5 bash {cyan('collect/all.sh')}   collect more")
+        return
+
+    print(bold("YOUR MOVE"))
+    if ready:
+        top = ready[0]
+        print(f"  {len(ready)} row(s) are waiting for you to check them against their")
+        print("  sources. Nothing reaches the published Scoreboard until you do.")
+        print()
+        print(f"      {ENTRY} {cyan('review')}")
+        print()
+        print("  It walks them largest-capital first, shows both source links, and")
+        print("  writes nothing until you confirm. `s` skips, `q` stops; re-running")
+        print(f"  picks up where you left off. First up: {top['project'][:46]}")
+    if blocked:
+        ids = ", ".join(f"#{r['id']}" for r in blocked[:5])
+        more = "" if len(blocked) <= 5 else f" (+{len(blocked) - 5} more)"
+        print()
+        print(f"  {len(blocked)} row(s) cannot be published until a failing check is")
+        print(f"  fixed -- {ids}{more}. See what is wrong with:")
+        print(f"      {ENTRY} {cyan('screen-check')} --id {blocked[0]['id']}")
 
 
 def cmd_webapp(conn, args):

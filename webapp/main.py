@@ -39,7 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi import FastAPI, Request  # noqa: E402
 from fastapi.responses import HTMLResponse, RedirectResponse  # noqa: E402
 
-from pipeline import orchestrate as orch  # noqa: E402
+from pipeline import orchestrate as orch, screen  # noqa: E402
 from pipeline.db import (  # noqa: E402
     connect, init_db, is_read_only, set_active_db, table_counts,
 )
@@ -103,18 +103,61 @@ def dashboard(request: Request, msg: Optional[str] = None):
     conn = _conn()
     try:
         c = table_counts(conn)
+        q = screen.review_queue(conn)
     finally:
         conn.close()
+
+    n_ready, n_blocked = len(q["ready"]), len(q["blocked"])
+
+    # The five tiles were the whole page: five numbers, no verb, and nothing
+    # saying which of them was waiting on the person reading it. They link now,
+    # and the block below says what to do -- because "23 screened" is a triumph
+    # or a backlog depending on a fact the tiles do not show.
     body = f"""
 <div class="stages">
-  <div><div class="n">{c['source_collected']}</div>Source<br><small>collected</small></div>
-  <div><div class="n">{c['screen_extracted']}</div>Screen<br><small>extracted</small></div>
-  <div><div class="n">{c['screen_check']}</div>Screen<br><small>checks</small></div>
-  <div><div class="n">{c['verify_verified']}</div>Verify<br><small>verified</small></div>
-  <div><div class="n">{c['verify_edits']}</div>Verify<br><small>edits</small></div>
+  <a href="/source"><div><div class="n">{c['source_collected']}</div>Source<br><small>collected</small></div></a>
+  <a href="/screen"><div><div class="n">{c['screen_extracted']}</div>Screen<br><small>extracted</small></div></a>
+  <a href="/screen"><div><div class="n">{c['screen_check']}</div>Screen<br><small>checks</small></div></a>
+  <a href="/verify"><div><div class="n">{c['verify_verified']}</div>Verify<br><small>verified</small></div></a>
+  <a href="/verify"><div><div class="n">{c['verify_edits']}</div>Verify<br><small>edits</small></div></a>
 </div>
-
 """
+
+    if not n_ready and not n_blocked:
+        if not c["verify_verified"]:
+            body += """
+<div class="card"><h2>Nothing here yet</h2>
+<p>This database is empty. Collect some projects first — from a terminal, in
+<code>scoreboard/</code>:</p>
+<pre>N=5 bash collect/all.sh</pre></div>"""
+        else:
+            body += f"""
+<div class="card"><h2>Nothing waiting for you</h2>
+<p>All {c['verify_verified']} project(s) have been through the human gate.
+<a href="/verify">See the published rows</a>.</p></div>"""
+        return _page("Dashboard", body, msg)
+
+    ready_bit = ""
+    if n_ready:
+        top = q["ready"][0]
+        ready_bit = f"""
+<p><b>{n_ready} row(s) are waiting for you</b> to check them against their sources.
+Nothing reaches the published Scoreboard until you do — Verify is a human gate, by
+design, and no amount of collecting will move these along.</p>
+<p><a href="/screen?show=pending"><button class="primary" type="button">
+Start reviewing — {n_ready} waiting →</button></a></p>
+<p><small>Largest capital first. First up: {esc(top['project'])}.
+Or work the same queue in a terminal with <code>python3 scoreboard.py review</code>.</small></p>"""
+
+    blocked_bit = ""
+    if n_blocked:
+        links = ", ".join(f'<a href="/screen/{r["id"]}/inspect">#{r["id"]}</a>'
+                          for r in q["blocked"][:8])
+        blocked_bit = f"""
+<p><small>{n_blocked} row(s) cannot be published until a failing check is fixed:
+{links}.</small></p>"""
+
+    body += f'<div class="card"><h2>Your move</h2>{ready_bit}{blocked_bit}</div>'
     return _page("Dashboard", body, msg)
 
 

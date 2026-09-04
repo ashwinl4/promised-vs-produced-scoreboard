@@ -56,6 +56,14 @@ nav a { margin-right: 1rem; text-decoration: none; font-weight: 600; }
          text-align: center; margin: 1rem 0; }
 .stages div { border: 1px solid #8886; border-radius: 8px; padding: .6rem; }
 .stages .n { font-size: 1.6rem; font-weight: 700; }
+/* The tiles are links now, so each one is a door rather than a readout. They
+   must not look like body links: default anchor styling underlined every label
+   and repainted the counts visited-purple, which reads as decoration on the
+   numbers rather than as a control. Inherit the text colour, drop the
+   underline, and let the border do the affordance on hover. */
+.stages a { color: inherit; text-decoration: none; display: block; }
+.stages a div { transition: border-color .12s ease, background .12s ease; }
+.stages a:hover div { border-color: #888c; background: #8881; }
 .card { border: 1px solid #8885; border-radius: 8px; padding: .8rem 1rem;
         margin: .6rem 0; }
 .card small { color: #8889; }
@@ -181,7 +189,12 @@ def _resolve_show(request: Request, stage: str, show: str | None) -> str:
     if show in SHOW_MODES:
         return show
     remembered = request.cookies.get(SHOW_COOKIE[stage])
-    return remembered if remembered in SHOW_MODES else "all"
+    if remembered in SHOW_MODES:
+        return remembered
+    # "pending" rather than "all" on a first visit: these pages exist to work a
+    # queue, and a queue that opens showing the finished items alongside the
+    # unfinished ones makes the reader do the filtering the page could do.
+    return "pending"
 
 
 def _remember_show(resp: HTMLResponse, stage: str, show: str) -> HTMLResponse:
