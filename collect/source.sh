@@ -85,7 +85,13 @@ if [ "${PREFLIGHT:-1}" = "1" ]; then
 fi
 
 PROMPT="$(cat "$PROMPT_FILE")"
-count() { "$PY" -m pipeline.cli status | awk -v t="$COUNT_TABLE" '$0 ~ t {print $NF}'; }
+# What the loop counts to decide it is done. `count` prints one integer, and for
+# screen_extracted it prints DISTINCT PROJECTS rather than rows -- a lead
+# extracted twice is one project, and counting rows let a duplicate tick the
+# counter, so an N=20 run stopped at 19 real projects and called it success.
+# (This used to awk the last field out of the human-readable `status` table,
+# which tied the stop condition to that table's wording.)
+count() { "$PY" -m pipeline.cli count "$COUNT_TABLE"; }
 
 # --- How the CLI reports itself -------------------------------------------- #
 # Every `claude -p` call ends by reporting the tokens it spent and the models it
@@ -200,7 +206,7 @@ for i in $(seq 1 "$MAX_ITERS"); do
   # scoped by construction. The two guardrails below still have to be said: with
   # Bash pre-approved above, the process could otherwise re-launch the loop that
   # started it, and Verify is a human-only gate.
-  "$CLAUDE" -p "@docs/cli.md is attached as reference context -- it is this pipeline's CLI reference. Never run a shell script from collect/ (that is the loop that launched you), and never promote to Verify (verify-promote / --promote-tier) -- that is a human-only gate. Now carry out your operating instructions (in the system prompt) to completion using the real pipeline CLI. Do only what those instructions say." \
+  "$CLAUDE" -p "@docs/cli.md is attached as reference context -- it is this pipeline's CLI reference. Never run a shell script from collect/ (that is the loop that launched you), never promote to Verify (verify-promote / --promote-tier) -- that is a human-only gate -- and never delete rows (screen-remove): if an extraction of yours is wrong, re-add it with --replace, which supersedes it in one step. Now carry out your operating instructions (in the system prompt) to completion using the real pipeline CLI. Do only what those instructions say." \
     --model "$MODEL" \
     --effort "$EFFORT" \
     --append-system-prompt "$PROMPT" \

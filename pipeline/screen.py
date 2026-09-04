@@ -47,17 +47,95 @@ def _coerce(col: str, value) -> object:
     return value
 
 
+class DuplicateExtraction(Exception):
+    """A Screen row already exists for this Source lead."""
+
+
+class RemovalBlocked(Exception):
+    """The Screen row cannot be removed, because something downstream cites it."""
+
+
+def extracted_for_source(conn: sqlite3.Connection, source_collected_id: int) -> list[int]:
+    """Screen row ids already extracted from a given Source lead."""
+    return [r["id"] for r in conn.execute(
+        "SELECT id FROM screen_extracted WHERE source_collected_id = ? ORDER BY id",
+        (source_collected_id,),
+    ).fetchall()]
+
+
+def distinct_project_count(conn: sqlite3.Connection) -> int:
+    """How many distinct projects Screen holds, not how many rows.
+
+    A lead extracted twice is one project, and the collection loop stops when it
+    has added enough PROJECTS -- so this, not COUNT(*), is what it must count.
+    Rows with no lineage (added by hand, source_collected_id NULL) cannot be
+    compared to anything, so each counts once: -id gives every one of them a key
+    of its own that can never collide with a real lead id.
+    """
+    return int(conn.execute(
+        "SELECT COUNT(*) FROM (SELECT 1 FROM screen_extracted "
+        "GROUP BY COALESCE(source_collected_id, -id))"
+    ).fetchone()[0])
+
+
+def remove_extracted(conn: sqlite3.Connection, screen_id: int) -> dict:
+    """Delete one Screen row and the checks that judged it. Returns what went.
+
+    Refuses when the row has been published: a Verify row names the Screen row
+    it came from, and deleting it would leave published research data pointing
+    at nothing. Retract the Verify row first if that is really the intent.
+    """
+    row = get_extracted(conn, screen_id)
+    if row is None:
+        raise ValueError(f"no screen_extracted row with id {screen_id}")
+    published = [r["id"] for r in conn.execute(
+        "SELECT id FROM verify_verified WHERE screen_extracted_id = ?", (screen_id,)
+    ).fetchall()]
+    if published:
+        raise RemovalBlocked(
+            f"screen #{screen_id} was published as verify "
+            f"#{', #'.join(str(v) for v in published)}. Removing it would leave "
+            "that published row citing a source row that no longer exists."
+        )
+    n_checks = conn.execute(
+        "DELETE FROM screen_check WHERE screen_extracted_id = ?", (screen_id,)
+    ).rowcount
+    conn.execute("DELETE FROM screen_extracted WHERE id = ?", (screen_id,))
+    conn.commit()
+    return {"id": screen_id, "project": row["project"], "checks": n_checks}
+
+
 def insert_extracted(
     conn: sqlite3.Connection,
     row: dict,
     source_collected_id: int | None = None,
+    replace: bool = False,
 ) -> int:
     """Insert one `screen_extracted` row. Returns its id.
 
     `row` is a mapping of (some of) the 17 v0 columns. Missing columns become
     NULL. verification_tier is forced to 'P' -- Screen is provisional by
     construction, so whatever the extractor claimed is overridden here.
+
+    One Source lead extracts to one Screen row. A second attempt on the same
+    lead raises DuplicateExtraction unless `replace` is set, in which case the
+    earlier row (and its checks) are removed first. The N=20 run is why: a row
+    failed its check over a bad cell, the extractor corrected the JSON and added
+    it again, and both copies stayed -- one project counted twice, with no way
+    to delete either. Refusing here is what stops that from being possible.
     """
+    if source_collected_id is not None:
+        existing = extracted_for_source(conn, source_collected_id)
+        if existing and not replace:
+            raise DuplicateExtraction(
+                f"source #{source_collected_id} is already extracted as screen "
+                f"#{', #'.join(str(e) for e in existing)}. To correct that row, "
+                f"re-add with --replace; to keep both, they are not the same "
+                f"project and one of them has the wrong --source-id."
+            )
+    else:
+        existing = []
+
     values = {c: _coerce(c, row.get(c)) for c in V0_COLUMNS}
     values["verification_tier"] = "P"  # invariant at this stage
     # Deterministically derive the *_dt columns and the float lag/slip from the
@@ -83,6 +161,15 @@ def insert_extracted(
         params,
     )
     conn.commit()
+
+    # Supersede only once the replacement is safely in. Removing first looked
+    # tidier and was wrong: this INSERT can still fail (a NOT NULL column the
+    # corrected JSON forgot, say), and by then the row being corrected would
+    # already be deleted -- a bad row replaced by no row at all. Caught in
+    # testing, on exactly that failure.
+    for old_id in existing:
+        remove_extracted(conn, old_id)
+
     return int(cur.lastrowid)
 
 

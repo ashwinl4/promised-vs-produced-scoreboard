@@ -373,17 +373,22 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+# The five tables, in pipeline order. Named once, so anything that has to offer
+# them as a choice (the `count` command, for one) cannot drift out of step with
+# what `table_counts` actually reports.
+TABLES = [
+    "source_collected",
+    "screen_extracted",
+    "screen_check",
+    "verify_verified",
+    "verify_edits",
+]
+
+
 def table_counts(conn: sqlite3.Connection) -> dict[str, int]:
     """Row counts per table -- the pipeline's at-a-glance status."""
-    tables = [
-        "source_collected",
-        "screen_extracted",
-        "screen_check",
-        "verify_verified",
-        "verify_edits",
-    ]
     counts = {}
-    for t in tables:
+    for t in TABLES:
         try:
             counts[t] = conn.execute(f"SELECT COUNT(*) AS n FROM {t}").fetchone()["n"]
         except sqlite3.OperationalError:

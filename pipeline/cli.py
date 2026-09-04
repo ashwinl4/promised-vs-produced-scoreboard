@@ -40,7 +40,7 @@ for _stream in (sys.stdout, sys.stderr):
 
 from pipeline import source, screen, verify, orchestrate as orch, llm  # noqa: E402
 from pipeline.db import (  # noqa: E402
-    DEFAULT_DB, connect, db_path, init_db, table_counts,
+    DEFAULT_DB, TABLES, connect, db_path, init_db, table_counts,
 )
 from pipeline.schema_check import (  # noqa: E402
     V0_COLUMNS,
@@ -525,8 +525,40 @@ def cmd_screen_add(conn, args):
     else:
         with open(args.json, encoding="utf-8") as fh:
             row = json.load(fh)
-    sid = screen.insert_extracted(conn, row, source_collected_id=args.source_id)
+    try:
+        sid = screen.insert_extracted(conn, row, source_collected_id=args.source_id,
+                                      replace=args.replace)
+    except screen.DuplicateExtraction as e:
+        raise SystemExit(f"refused: {e}")
     print(f"inserted screen_extracted #{sid} (tier forced to P)")
+
+
+def cmd_screen_remove(conn, args):
+    try:
+        gone = screen.remove_extracted(conn, args.id)
+    except screen.RemovalBlocked as e:
+        raise SystemExit(f"refused: {e}")
+    except ValueError as e:
+        raise SystemExit(str(e))
+    print(f"removed screen_extracted #{gone['id']} ({gone['project'] or 'no project name'})"
+          f" and {gone['checks']} check(s)")
+
+
+def cmd_count(conn, args):
+    """One integer on stdout, for the collection loops to compare against.
+
+    The loops used to read this out of `status` with awk, taking the last field
+    of a matching line -- which tied a shell loop's stop condition to the exact
+    wording of a human-readable table. This is the machine-readable answer.
+
+    screen_extracted reports DISTINCT PROJECTS, because that is what the loop is
+    trying to add. Counting rows let a duplicate extraction tick the counter, so
+    an N=20 run stopped at 19 real projects and reported success.
+    """
+    if args.table == "screen_extracted":
+        print(screen.distinct_project_count(conn))
+        return
+    print(table_counts(conn)[args.table])
 
 
 def cmd_screen_extract(conn, args):
@@ -1342,7 +1374,23 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("screen-add", help="[manual] add a Screen row from JSON")
     s.add_argument("--json", required=True, help="path to a JSON file, or - for stdin")
     s.add_argument("--source-id", type=int, help="originating source lead id (lineage)")
+    s.add_argument("--replace", action="store_true",
+                   help="this Source lead is already extracted: drop that row and "
+                        "its checks, and use this one instead")
     s.set_defaults(fn=cmd_screen_add)
+
+    s = sub.add_parser("screen-remove",
+                       help="[human] delete a Screen row and its checks")
+    s.add_argument("--id", type=int, required=True, help="the screen_extracted id")
+    s.add_argument("--yes", action="store_true", required=True,
+                   help="required: this deletes a row, and there is no undo")
+    s.set_defaults(fn=cmd_screen_remove)
+
+    s = sub.add_parser("count",
+                       help="print one number: how many rows a stage holds")
+    s.add_argument("table", choices=sorted(TABLES),
+                   help="screen_extracted counts distinct projects, not rows")
+    s.set_defaults(fn=cmd_count)
 
     s = sub.add_parser("screen-prompt",
                        help="[prompt] print the Screen prompt for a Source lead")

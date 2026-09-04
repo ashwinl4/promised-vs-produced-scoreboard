@@ -137,10 +137,9 @@ stage_cfg() {
   else printf '%s' "$fallback"; fi
 }
 
-count() {
-  "$PY" -m pipeline.cli status \
-    | awk -v t="$1" '$0 ~ t {print $NF}'
-}
+# See the note in source.sh: one integer, and screen_extracted counts distinct
+# projects rather than rows so a duplicate extraction cannot tick the counter.
+count() { "$PY" -m pipeline.cli count "$1"; }
 
 # --- Run one stage --------------------------------------------------------- #
 # Each stage is launched with an explicit, self-contained env (env -u strips any
