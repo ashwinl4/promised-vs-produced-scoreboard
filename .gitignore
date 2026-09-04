@@ -27,3 +27,10 @@
 # thing: it is the provenance record for that corpus, and it gets allowlisted
 # here by name, the same way the canonical database is above.
 logs/*.log
+
+# Working files from collect/. Each run writes the lead or row it is about to
+# ingest as JSON, then calls source-add / screen-add on it. Once the command
+# returns, the database holds the content and the file is just the envelope it
+# arrived in. The README is tracked so the directory exists in a fresh clone.
+scratch/*
+!scratch/README.md

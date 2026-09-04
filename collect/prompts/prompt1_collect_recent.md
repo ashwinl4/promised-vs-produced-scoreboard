@@ -4,13 +4,13 @@ You are running as a single Claude Code call. You have been shown
 `docs/cli.md`, the pipeline's command reference. Do **only** what this prompt says.
 
 **Where to run:** from the `scoreboard/` directory —
-`python -m pipeline.cli ...`.
+`python3 -m pipeline.cli ...`.
 
 **You must use web fetch / scraping** for everything — do not rely on in-model
 knowledge for either the announcement or (especially) the current status.
 
 **You must run the real pipeline code** — a lead enters Source only via
-`python -m pipeline.cli source-add`. Do not invent scripts.
+`python3 -m pipeline.cli source-add`. Do not invent scripts.
 
 ## How many to collect this call: up to 5, one at a time
 
@@ -66,7 +66,7 @@ preference for size.
 
 1. **Refresh the rules + exclusion list.** Run:
    ```
-   python -m pipeline.cli source-prompt
+   python3 -m pipeline.cli source-prompt
    ```
    That renders `prompt_source_collected.md` **plus the live "do not collect these"
    lists** (published + already collected — including every lead you added earlier
@@ -82,7 +82,7 @@ preference for size.
    identify the project.
 5. **Ingest the lead** with the real command:
    ```
-   python -m pipeline.cli source-add --json lead.json --via prompt1   # or: --json - --via prompt1
+   python3 -m pipeline.cli source-add --json scratch/lead.json --via prompt1   # or: --json - --via prompt1
    ```
    The `--via prompt1` flag records this lead's provenance in
    `source_collected.collected_via` (open-web discovery) — always include it.

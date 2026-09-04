@@ -4,7 +4,7 @@ You are running as a single Claude Code call. You have been shown
 `docs/cli.md`, the pipeline's command reference. Do **only** what this prompt says.
 
 **Where to run:** from the `scoreboard/` directory —
-`python -m pipeline.cli ...`.
+`python3 -m pipeline.cli ...`.
 
 **You must use web fetch / scraping** to read the lead's links — extract only what
 the sources actually state, never from in-model knowledge.
@@ -19,14 +19,14 @@ Almost all of this already exists — do not rewrite the extraction rules. Pick 
 Source lead that has no Screen row yet:
 
 ```
-python -m pipeline.cli source-list        # choose an id, N
+python3 -m pipeline.cli source-list        # choose an id, N
 ```
 
 Then print the **standardized** Screen operating prompt for that lead and follow it
 exactly:
 
 ```
-python -m pipeline.cli screen-prompt --source-id N
+python3 -m pipeline.cli screen-prompt --source-id N
 ```
 
 That output is `prompt_screen_extracted.md` + the live sector vocabulary + this
@@ -50,8 +50,8 @@ you name the candidate in `flag` — never a sector name you coined, never an ed
    `verification_tier` — the pipeline derives/forces those.
 3. Ingest and check with the real commands:
    ```
-   python -m pipeline.cli screen-add --json row.json --source-id N
-   python -m pipeline.cli screen-check --id <new screen id>
+   python3 -m pipeline.cli screen-add --json scratch/row.json --source-id N
+   python3 -m pipeline.cli screen-check --id <new screen id>
    ```
    Read the verdict. If it FAILs on something the sources let you fix, correct the
    JSON and re-add. No smoke testing beyond running the check.

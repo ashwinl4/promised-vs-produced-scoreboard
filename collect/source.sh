@@ -63,13 +63,6 @@ PY="$(command -v python3 || command -v python)"
 CLAUDE="$(command -v claude || echo "$HOME/.local/bin/claude")"
 [ -x "$CLAUDE" ] || { echo "ERROR: claude CLI not found ($CLAUDE)"; exit 1; }
 
-# Some systems ship only `python3`, but the prompts/README call bare `python`.
-# Put a `python` -> python3 shim on PATH for the process (no system change).
-if ! command -v python >/dev/null 2>&1; then
-  SHIM="$(mktemp -d)"; ln -s "$PY" "$SHIM/python"; export PATH="$SHIM:$PATH"
-  trap 'rm -rf "$SHIM"' EXIT
-fi
-
 # --- Preflight: the claude CLI must be authenticated ----------------------- #
 # One tiny call detects the "Not logged in" state so we fail fast with guidance
 # instead of spinning through failed iterations. Skip with PREFLIGHT=0.

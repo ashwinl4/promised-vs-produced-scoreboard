@@ -16,7 +16,7 @@ Run everything from `aici/scoreboard`. Two invocations, identical in effect:
 
 ```bash
 python3 scoreboard.py <command>     # the documented entry point
-python -m pipeline.cli <command>    # the long form, and what the prompts use
+python3 -m pipeline.cli <command>   # the long form, and what the prompts use
 ```
 
 ## What you need

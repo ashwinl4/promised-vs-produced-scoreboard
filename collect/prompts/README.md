@@ -45,7 +45,7 @@ they ever disagree, the scripts are correct.
 ## Constraints when writing or running these prompts
 
 - Pipeline commands run from the `scoreboard/` directory
-  (`python -m pipeline.cli ...`), per
+  (`python3 -m pipeline.cli ...`), per
   [`docs/cli.md`](../../docs/cli.md).
 - Reference `prompt_source_collected.md` and `prompt_screen_extracted.md` through
   `source-prompt` / `screen-prompt` instead of restating their rules.

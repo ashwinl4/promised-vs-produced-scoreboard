@@ -70,7 +70,7 @@ that don't actually pair up, isn't ready — leave it in Screen.
 Once the sources check out:
 
 ```
-python -m pipeline.cli verify-promote --screen-id N --tier V1
+python3 -m pipeline.cli verify-promote --screen-id N --tier V1
 ```
 
 Use `--set col=value` to correct a cell at promotion time (e.g. fix a date the
