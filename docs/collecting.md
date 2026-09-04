@@ -2,9 +2,10 @@
 
 *Directory: [`collect/`](../collect/) — `all.sh`, `source.sh`, `screen.sh`, `prompts/`*
 
-Where the [bulk import](../../reference/bulk-import-experiment/) was a one-off
-load, this is the ongoing collection: shell loops that find new projects and
-extract them into rows, one per iteration. The short version is in the
+This is the ongoing collection: shell loops that find new projects and extract
+them into rows, one per iteration. It is the counterpart to the one-off bulk
+import that seeded an earlier corpus, which is archived outside this directory
+under `reference/bulk-import-experiment/`. The short version is in the
 [scoreboard README](../README.md#add-data); this is the full set of controls.
 Bookkeeping is below, and the full methodology is in
 [`prompts/README.md`](../collect/prompts/README.md) and each `promptN_*.md`
@@ -24,10 +25,10 @@ one before it, and the only thing they share is the database.
 What a row records about its own origin is the **entry path**, in
 `collected_via` — `prompt1`, `prompt2`, `api`, `manual`, and so on. There is no
 column saying "AI" or "human": the [README](../README.md#how-a-project-gets-in)
-and the [methodology](../../paper/docs/v2-scoreboard-methodology.md) describe
-Source and Screen as "AI or human" because either can do them, not because the
-database stores which. Verify is the stage where that distinction is fixed, and
-there it is always human.
+and the project's methodology document (`paper/docs/v2-scoreboard-methodology.md`,
+outside this directory) describe Source and Screen as "AI or human" because
+either can do them, not because the database stores which. Verify is where that
+distinction is fixed, and there it is always human.
 
 One word means something else in this repo: an **assistant** is a chat product
 you paste `source-prompt` into — ChatGPT, Gemini, Perplexity, Claude. That is a
