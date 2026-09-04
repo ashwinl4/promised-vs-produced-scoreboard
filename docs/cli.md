@@ -75,7 +75,7 @@ python3 scoreboard.py export [--out-dir DIR]       # five CSVs
 python3 scoreboard.py coverage --against ref.csv [--stage verify] [--min-capital N]
 python3 scoreboard.py coverage --selftest          # needs no database
 
-# The extensible sector vocabulary
+# The sector vocabulary  (sectors-add is a HUMAN decision — NEVER run it as a worker)
 python3 scoreboard.py sectors-list
 python3 scoreboard.py sectors-add "Cement"
 

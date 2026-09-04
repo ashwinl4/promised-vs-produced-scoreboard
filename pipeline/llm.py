@@ -148,15 +148,18 @@ def render_screen_prompt(lead: dict) -> str:
     """
     prompt = _operating_prompt("prompt_screen_extracted.md")
     prompt += (
-        "\n\n## Sector vocabulary — classify into ONE of these\n"
+        "\n\n## Sector vocabulary — classify into ONE of these, exactly\n"
         "> " + " · ".join(sorted(all_sectors())) + "\n\n"
-        "These are the defined manufacturing sectors (the pipeline is **not** "
-        "sector-agnostic). Pick the one that fits. Only if the project is "
-        "**clearly** a different *manufacturing* sector, use a new short sector "
-        "name and say so in `flag` (e.g. \"new sector: Cement\"). If you are "
-        "running this in Claude Code, also add that new sector to the `SECTORS` "
-        "set in `schema.py` so the vocabulary grows with the "
-        "data; otherwise a sector outside this list is rejected by the checker."
+        "This list is **closed**. The `sector` value must be one of the strings "
+        "above, copied exactly. Do **not** invent a sector, coin a narrower or more "
+        "precise label, or adapt one of these. If the project fits none of them "
+        "well, the answer is `Other` — that is what `Other` is for. If you think a "
+        "genuinely new manufacturing sector is warranted, still write `Other` and "
+        "name the candidate in `flag` (e.g. \"Other used; candidate new "
+        "sector: Cement\") so a human can decide. Do **not** edit `SECTORS` in "
+        "`schema.py`, and do **not** run `sectors-add` or `register_sector()` — "
+        "extending the vocabulary is a human decision, not yours. A sector outside "
+        "the list above is rejected by the checker."
     )
     prompt += (
         "\n\n## The lead to extract from\n\n"

@@ -29,9 +29,23 @@ commits immediately, a lead you just added is instantly visible to the next
 `source-prompt`. So refresh the exclusion list before each pick rather than trying
 to remember what you've done.
 
-To keep the five productive, **vary your search axis** across them — a different
-sector, state, and announcement year each time — so you cover new ground instead of
-circling the same few famous megaprojects.
+**Those lists exclude sites, not companies.** One site = one project, so a company
+already in the lists is not itself excluded — a *different* facility of that company, in
+another state or of another kind, is a genuinely new project and is fair game. Only that
+site's own expansion or re-announcement is excluded.
+
+To keep the five productive, **vary your search axis** — a different sector, state, and
+announcement year each time. Repeating one axis returns the same top results, the
+exclusion list removes them, and you burn a pick. This is about the query, not the
+project: never pass over a large project to satisfy it.
+
+The sectors to rotate through: **aerospace and defense, auto assembly, battery,
+chemicals and plastics, food and beverage, machinery, pharmaceuticals, semiconductors,
+solar, steel**, plus **other** for a manufacturing project that fits none of them.
+That is a search-planning aid — the list `source-prompt` prints is the authoritative
+one. The list is **closed**: never invent a sector name to fit a project you like. A
+project that would need one is either **other** or not manufacturing, and
+non-manufacturing projects are out regardless.
 
 ### Prioritise $1B and above — but keep what you find below it
 

@@ -30,11 +30,12 @@ entire job — you are assembling a lead, nothing more.
   claims (treat "~200 direct (1,000 regional)" as 200).
 - **Sector:** the project must be in one of the defined **manufacturing** sectors —
   **aerospace and defense, auto assembly, battery, chemicals and plastics, food and
-  beverage, machinery, pharmaceuticals, semiconductors, solar, or steel**.
+  beverage, machinery, pharmaceuticals, semiconductors, solar, steel**, or **other**
+  (a manufacturing project that genuinely fits none of the named ten).
   Pharmaceuticals covers drug substance, active ingredient and biologics plants;
-  solar covers cell and panel manufacturing. (The set is extensible: a clearly
-  different *manufacturing* sector can be proposed later, but do not stray into
-  non-manufacturing projects.)
+  solar covers cell and panel manufacturing. This list is **closed** and is not yours
+  to extend: a project you would have to invent a new sector name for is either
+  **other**, or — if it is not manufacturing at all — out of scope entirely.
 
 ## Only collect NEW projects — not ones already in the verify table
 
@@ -46,21 +47,12 @@ you at runtime in a section titled *"The verify table already holds these"* belo
 pipeline reads it straight from the table before handing you this prompt). Do **not** collect
 any project already in that list, nor a mere expansion / re-announcement of one.
 
-That injected list is the only exclusion on this basis. If it says the table is
-empty, then nothing is excluded and every qualifying project is fair game —
-including the largest and most obvious ones.
+If that list says the table is empty, nothing is excluded on this basis and every
+qualifying project is fair game — including the largest and most obvious ones.
 
-Projects still sitting in Source/Screen — collected but not yet verified into verify — are
-supplied separately in a section titled *"Already in flight — collected but not yet verified"*
-below (Screen `project` names and one-line Source summaries). **Also avoid those**: verify is
-the authority for "verified," but re-collecting a lead already in flight just produces
-duplicates. If that section is absent, no in-flight leads have been recorded yet.
-
-## Handle exactly one project at a time
-
-Pick **one** qualifying project, collect its sources, output **one** record, and stop.
-Do not list, rank, compare, or batch multiple projects in a run. (This may be expanded
-later; keep it to one for now.)
+A second section, *“Already in flight — collected but not yet verified”*, lists leads
+sitting in Source/Screen (Screen `project` names and Source summaries). **Also avoid
+those** — re-collecting an in-flight lead just produces duplicates.
 
 ## Neutrality — this matters
 
@@ -94,15 +86,13 @@ Rules:
 - **Do not extract or normalize figures.** Reading the announcement enough to confirm the
   size floor is fine, but do **not** record the capital amount, job count, or dates as
   structured fields — that is the next step's job. Source holds links + a summary only.
-- **The table allows duplicates, but coverage is the goal.** The `source_collected` table
-  has no unique constraint (two collectors filing the same links is tolerated), but that is
-  *not* a license to re-file a site that's already tracked — actively target a project not
-  in the exclusion list above.
+- **Duplicates are tolerated, not licensed.** The table has no unique constraint, but that
+  is not a reason to re-file a site already named in the exclusion sections above.
 
 ## Output format
 
 Return exactly one JSON object with these keys (omit `promised_date_source` if you have
-none):
+none). One record per run — do not list, rank, or compare candidates alongside it:
 
 ```json
 {

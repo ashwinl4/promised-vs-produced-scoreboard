@@ -34,6 +34,11 @@ lead's links + the exact JSON hand-back format. It is the single source of truth
 the 17 fields, the `*_raw → token → *_dt` date rules, and what the deterministic
 checker enforces. Follow it verbatim.
 
+One part of that prompt gets misread often: the **sector vocabulary is closed**. Use
+one of the strings it lists, copied exactly. If none fits, the answer is `Other`, and
+you name the candidate in `flag` — never a sector name you coined, never an edit to
+`SECTORS` in `schema.py`, and never `sectors-add`.
+
 ## Your job
 
 1. `web_fetch` the lead's `promise_source` / `status_source` (and

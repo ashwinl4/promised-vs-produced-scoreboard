@@ -18,11 +18,7 @@ link, a `status_source` link, an optional `promised_date_source` link, and a sho
 summary. **Open those links, read them, and fill in one project row** with the 17 core
 fields below — **plus, for each of the three dates, a `*_raw` verbatim partner** (see
 *Date interpretation*). Extract only what the sources actually state; where a source can't
-be read or a value can't be found, record that in `flag` rather than guessing.
-
-## Handle exactly one project
-
-One lead in, one `screen_extracted` row out. Do not merge multiple projects.
+be read or a value can't be found, record that in `flag` rather than guessing. **One lead in, one row out** — never merge projects.
 
 ## The 17 fields (schema of `screen_extracted`)
 
@@ -33,7 +29,7 @@ the originating Source row's id, include it as `source_collected_id` for lineage
 | Field | Rule (this is what the checker enforces) |
 |---|---|
 | `project` | Non-empty name of the facility/project, e.g. `TSMC Fab 1 Phoenix`. Unique per project. |
-| `sector` | **A defined manufacturing sector (standardized).** Classify into one of the sectors in the *Sector vocabulary* list appended below (the base set is `Aerospace and Defense`, `Auto Assembly`, `Battery`, `Chemicals and Plastics`, `Food and Beverage`, `Machinery`, `Pharmaceuticals`, `Semiconductors`, `Solar`, `Steel`, `Other`. `Pharmaceuticals` covers drug substance, API and biologics plants; `Solar` covers cell and panel manufacturing; `Other` is for a manufacturing project that genuinely fits none of them). Only if the project is **clearly** a different *manufacturing* sector, use a new short sector name, note it in `flag` (e.g. `new sector: Cement`), and register it (Claude Code edits `SECTORS`; the API path calls `register_sector()`). A sector outside the vocabulary is an ERROR until it is added. |
+| `sector` | **A defined manufacturing sector (standardized).** Classify into one of the sectors in the *Sector vocabulary* list appended below (the base set is `Aerospace and Defense`, `Auto Assembly`, `Battery`, `Chemicals and Plastics`, `Food and Beverage`, `Machinery`, `Pharmaceuticals`, `Semiconductors`, `Solar`, `Steel`, `Other`. `Pharmaceuticals` covers drug substance, API and biologics plants; `Solar` covers cell and panel manufacturing; `Other` is for a manufacturing project that genuinely fits none of them). The list is **closed**: copy one of those strings exactly. Never invent a sector, coin a narrower label, edit `SECTORS`, or run `sectors-add` / `register_sector()` — extending the vocabulary is a human decision, not yours. If nothing fits, use `Other` and name the candidate in `flag` (e.g. `Other used; candidate new sector: Cement`). A sector outside the vocabulary is an ERROR. |
 | `state` | 2-letter US postal abbreviation (e.g. `AZ`, `TX`). |
 | `announced` | **Normalized token — strict `YYYY-MM`** — the announcement month. This is the row's anchor and the denominator for lag/slip, so it must be exact and match the source. No fuzzy values. (The pipeline stores its resolved date as `announced_dt`.) |
 | `announced_raw` | **The exact source text** the `announced` date was read from, copied **verbatim** (e.g. `announced the project in May 2020`). Provenance only — never parsed. |
@@ -73,36 +69,13 @@ you supply the **first two**:
 3. **`*_dt` — the resolved ISO date**, computed by the pipeline from the token (below).
 
 If you omit a `*_raw`, the pipeline falls back to storing the token as the raw — so always
-provide the real verbatim quote when you can; that is the whole point of this field. These
-are the exact rules the pipeline applies to turn a **token** into `*_dt` (recorded here so
-they're auditable):
+If you omit a `*_raw`, the pipeline falls back to storing the token as the raw — so always
+provide the real verbatim quote when you can; that is the whole point of this field.
 
-**Resolving a date string to `*_dt` (a *range* collapses to its "healthy middle",** the
-same mid-window trick `plot_promised_vs_produced.py` uses):
-
-| The string says… | Resolved `*_dt` |
-|---|---|
-| `YYYY-MM-DD` | that exact day |
-| `YYYY-MM` (incl. the `announced` anchor) | the **15th** of that month |
-| `YYYY-Qn` | the quarter's midpoint (Q1→`02-15`, Q2→`05-15`, Q3→`08-15`, Q4→`11-15`) |
-| `YYYY (first half)` / `H1` | `YYYY-04-01` |
-| `YYYY (second half)` / `(late)` | `YYYY-10-01` |
-| `YYYY (early)` | `YYYY-03-01` |
-| `YYYY (mid)` | `YYYY-07-01` |
-| a bare year `YYYY` | `YYYY-07-01` (mid-year) |
-| `pending` / `open` / `tbd` / `unconfirmed` / `n/a` | *no date* → "to be completed" |
-| `never` / cancelled | *no date* → "cancelled" |
-
-**Computing the floats** (both are `ROUND(days / 365.25, 1)`):
-
-- **`lag_years`** = `actual_first_output_dt` − `announced_dt`. The pipeline **asserts the
-  later date is actually later** (first output can't precede the announcement). If there is
-  no concrete `actual_first_output_dt`, it stores the **sentinel** `-1.0` ("to be
-  completed", i.e. not produced yet) or `-2.0` ("cancelled", for a `never`/cancelled
-  promise) — kept as floats so the column stays numeric.
-- **`slip_years`** = `actual_first_output_dt` − `promised_first_output_dt` (**negative =
-  early**, e.g. Hyundai shipped ahead of its first-half-2025 window). Same `-1.0` / `-2.0`
-  sentinels when it can't be computed.
+Coarser tokens resolve to the **middle** of their window (a bare year → mid-year, a
+quarter → its midpoint, `YYYY-MM` → the 15th), so keep every bit of precision the source
+actually gives: `2024-Q4` carries information a bare `2024` throws away. The resolution
+rules and the lag/slip arithmetic are implemented in `pipeline/dates.py`.
 
 Your job is only to extract each date's **verbatim `*_raw`** and its **clean token**
 accurately (and surface any date discrepancy in `flag`). Don't compute or supply lag/slip
@@ -142,9 +115,8 @@ just recorded:
 
 - **Extract, don't infer.** Record what the sources state. Don't fill gaps with outside
   knowledge or characterize outcomes beyond what's cited.
-- **Everything here is provisional (`P`).** You are producing a first draft for a later
-  verification gate — being explicit about what's shaky (via `flag`) is more valuable than
-  looking complete.
+- **Prefer honest over complete.** Being explicit about what is shaky (via `flag`) is worth
+  more than a row that looks finished.
 
 ## Output format
 
