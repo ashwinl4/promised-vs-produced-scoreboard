@@ -84,10 +84,41 @@ def export_table(conn: sqlite3.Connection, table: str, dest: Path) -> int:
     return n
 
 
-def export_all(db: str | Path | None = None, out_dir: str | Path | None = None) -> dict[str, int]:
-    """Export every table. Returns {label: rows written}, in ALL_TABLES order."""
+def export_dir(out_dir: str | Path | None = None,
+               db: str | Path | None = None) -> Path:
+    """Where export_all writes: csv_tables/ beside the database it read.
+
+    Defined once and used both to write and to report, so the path printed can
+    never be a different path from the one written to -- which is the failure
+    mode that let a scratch export land on the real corpus unnoticed.
+    """
+    if out_dir is not None:
+        return Path(out_dir)
     source = Path(db) if db is not None else db_path()
-    target_dir = Path(out_dir) if out_dir is not None else HERE.parent / "outputs" / "csv_tables"
+    return source.parent / "csv_tables"
+
+
+def export_all(db: str | Path | None = None, out_dir: str | Path | None = None) -> dict[str, int]:
+    """Export every table. Returns {label: rows written}, in ALL_TABLES order.
+
+    The CSVs are written next to the database they came from -- `csv_tables/`
+    in the database's own directory -- not to a fixed path. For the committed
+    database, `outputs/scoreboard.db`, that resolves to `outputs/csv_tables/`,
+    which is where they have always gone; nothing about the normal case moves.
+
+    What changes is every other case. The source honoured $SCOREBOARD_DB and
+    --db while the destination did not, so exporting a scratch database wrote
+    its rows straight over the real corpus's CSVs, with no warning and nothing
+    in the output naming the file it had just overwritten. It is a quiet way to
+    replace a 25-row published export with a 1-row test fixture, and it is how
+    this bug was found. pipeline/db.py already refuses the same thing on the
+    automatic path -- it declines to mirror any database that is not the
+    committed one -- and this brings the explicit command into line with it.
+
+    --out-dir still wins, for the case where you really do want them elsewhere.
+    """
+    source = Path(db) if db is not None else db_path()
+    target_dir = export_dir(out_dir, source)
     if not source.exists():
         raise FileNotFoundError(f"database not found: {source}")
     target_dir.mkdir(parents=True, exist_ok=True)

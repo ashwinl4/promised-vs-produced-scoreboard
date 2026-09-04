@@ -240,12 +240,17 @@ def cmd_collect(conn, args):
 # avoids a cycle: tools/load_csv.py imports this package.
 
 def cmd_export(conn, args):
-    from tools.export_tables import export_all, ALL_TABLES
+    from tools.export_tables import export_all, export_dir, ALL_TABLES
     # export_all opens the database read-only itself, and honours the same
-    # SCOREBOARD_DB that --db has already set.
+    # SCOREBOARD_DB that --db has already set -- for the destination as well as
+    # the source. The CSVs land in csv_tables/ beside whichever database was
+    # read, so pointing at a scratch copy can no longer overwrite the real one.
     counts = export_all(out_dir=args.out_dir)
+    # Say where they went. The old output named the files and not the
+    # directory, which is exactly the fact you needed to notice a wrong one.
+    print(f"wrote to {export_dir(args.out_dir)}/")
     for stage, n in counts.items():
-        print(f"scoreboard_{stage}.csv  <- {ALL_TABLES[stage]}  ({n} rows)")
+        print(f"  scoreboard_{stage}.csv  <- {ALL_TABLES[stage]}  ({n} rows)")
 
 
 def cmd_coverage(conn, args):

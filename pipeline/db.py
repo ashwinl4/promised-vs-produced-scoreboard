@@ -191,9 +191,9 @@ def _autoexport(target: Path) -> None:
     try:
         if str(SCOREBOARD_ROOT) not in sys.path:
             sys.path.insert(0, str(SCOREBOARD_ROOT))
-        from tools.export_tables import export_all
+        from tools.export_tables import export_all, export_dir
         export_all(db=target)
-        print("(database changed -- refreshed outputs/csv_tables/)", file=sys.stderr)
+        print(f"(database changed -- refreshed {export_dir(db=target)}/)", file=sys.stderr)
     except Exception as exc:                                    # noqa: BLE001
         print(f"warning: could not refresh outputs/csv_tables/ ({exc}). "
               "Run `python3 scoreboard.py export` before committing.", file=sys.stderr)
