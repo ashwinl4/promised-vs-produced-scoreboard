@@ -41,6 +41,10 @@ WARN = pvp_schema.WARN
 # paths use this to blank them; the checker uses it to catch any that
 # reached the database by some other route.
 NULL_STRINGS = pvp_schema.NULL_STRINGS
+# Does a provenance cell hold something URL-shaped? Returns None when it does.
+# Re-exported so the quality report can ask the same question the checker
+# asks, rather than growing its own idea of what a source link looks like.
+check_url = pvp_schema.check_url
 DATE_COLUMN_NULL_STRINGS = pvp_schema.DATE_COLUMN_NULL_STRINGS
 
 # Sector vocabulary, from the ONE source of truth. `all_sectors()` is the live

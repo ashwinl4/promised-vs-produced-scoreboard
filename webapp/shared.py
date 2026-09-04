@@ -67,6 +67,14 @@ nav a { margin-right: 1rem; text-decoration: none; font-weight: 600; }
 .card { border: 1px solid #8885; border-radius: 8px; padding: .8rem 1rem;
         margin: .6rem 0; }
 .card small { color: #8889; }
+/* Quality panel: label, bar, count. Grid rather than a table so the bars line
+   up at one width and the numbers stay right-aligned against them. */
+.qrow { display: grid; grid-template-columns: 15rem 1fr 5rem; gap: .75rem;
+        align-items: center; margin: .5rem 0; }
+.qtrack { background: #8882; border-radius: 4px; height: 1.1rem; overflow: hidden; }
+.qfill { height: 100%; border-radius: 4px; }
+.qnum { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .qrow { grid-template-columns: 1fr; } }
 form.inline { display: inline; }
 label { display: block; margin: .4rem 0 .1rem; font-size: .85rem; color: #8889; }
 input[type=text], textarea, select { width: 100%; padding: .35rem .5rem;

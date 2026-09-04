@@ -42,7 +42,7 @@ from pipeline import source, screen, verify, orchestrate as orch, llm  # noqa: E
 from pipeline.db import (  # noqa: E402
     DEFAULT_DB, TABLES, connect, db_path, init_db, table_counts,
 )
-from pipeline import models  # noqa: E402
+from pipeline import models, quality  # noqa: E402
 from pipeline.dates import enrich as enrich_dates  # noqa: E402
 from pipeline.schema_check import (  # noqa: E402
     V0_COLUMNS,
@@ -597,6 +597,49 @@ def cmd_screen_remove(conn, args):
         raise SystemExit(str(e))
     print(f"removed screen_extracted #{gone['id']} ({gone['project'] or 'no project name'})"
           f" and {gone['checks']} check(s)")
+
+
+def cmd_quality(conn, args):
+    """Five measures of whether this corpus can carry the claim.
+
+    Deliberately five numbers and not one. A blended score invites an argument
+    about the weights, and a referee will ask what is in it; five bars with the
+    rows behind them say which rows to go fix.
+    """
+    m = quality.measure(conn)
+    if not m["total"]:
+        print("No Screen rows yet. Collect some first:  N=5 bash collect/all.sh")
+        return
+    colour = _use_colour()
+    bold = (lambda t: f"{_ANSI['bold']}{t}{_ANSI['off']}") if colour else (lambda t: t)
+    cyan = (lambda t: f"{_ANSI['cyan']}{t}{_ANSI['off']}") if colour else (lambda t: t)
+
+    print(bold(f"Scoreboard quality — {m['total']} Screen rows"))
+    print("=" * 66)
+    for b in m["bars"]:
+        print(f"  {b['label']:<20}{b['n']:>3}/{b['total']:<4}{b['pct']:>4.0f}%  "
+              f"{quality.render_bar(b['pct'])}")
+        print(f"  {'':<20}{'':>8}      {b['why']}")
+        if args.rows and b["missing"]:
+            ids = ", ".join(f"#{i}" for i in b["missing"][:20])
+            more = "" if len(b["missing"]) <= 20 else f" (+{len(b['missing']) - 20})"
+            print(f"  {'':<20}{'':>8}      missing: {ids}{more}")
+        print()
+
+    f = m["flags"]
+    print(bold("Open questions"))
+    print(f"  {len(f['provenance']) + len(f['substantive'])} of {m['total']} rows "
+          "carry an unresolved flag, in two very different kinds:")
+    print(f"    {len(f['provenance']):>3}  a cited page could not be read "
+          "(403, 404, timeout, video-only)")
+    print(f"    {len(f['substantive']):>3}  the sources disagree, or do not say")
+    print()
+    print("  The first kind is an access failure — fetch it better and it goes")
+    print("  away. The second is a fact about the world and only a person can")
+    print("  settle it. Counting them together is why every row looked flagged.")
+    if not args.rows:
+        print()
+        print(f"  {cyan('--rows')} lists the row ids behind each measure.")
 
 
 def cmd_models(conn, args):
@@ -1508,6 +1551,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--yes", action="store_true", required=True,
                    help="required: this deletes a row, and there is no undo")
     s.set_defaults(fn=cmd_screen_remove)
+
+    s = sub.add_parser("quality",
+                       help="five measures of whether the corpus can carry the claim")
+    s.add_argument("--rows", action="store_true",
+                   help="list the row ids each measure is missing")
+    s.set_defaults(fn=cmd_quality)
 
     s = sub.add_parser("models",
                        help="which model each stage runs, and what decided it")

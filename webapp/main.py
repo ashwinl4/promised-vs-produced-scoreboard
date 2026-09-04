@@ -39,7 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi import FastAPI, Request  # noqa: E402
 from fastapi.responses import HTMLResponse, RedirectResponse  # noqa: E402
 
-from pipeline import orchestrate as orch, screen  # noqa: E402
+from pipeline import orchestrate as orch, quality, screen  # noqa: E402
 from pipeline.db import (  # noqa: E402
     connect, init_db, is_read_only, set_active_db, table_counts,
 )
@@ -104,6 +104,7 @@ def dashboard(request: Request, msg: Optional[str] = None):
     try:
         c = table_counts(conn)
         q = screen.review_queue(conn)
+        qual = quality.measure(conn)
     finally:
         conn.close()
 
@@ -158,7 +159,50 @@ Or work the same queue in a terminal with <code>python3 scoreboard.py review</co
 {links}.</small></p>"""
 
     body += f'<div class="card"><h2>Your move</h2>{ready_bit}{blocked_bit}</div>'
+    body += _quality_card(qual)
     return _page("Dashboard", body, msg)
+
+
+def _quality_card(m: dict) -> str:
+    """Five bars, and no blended score.
+
+    The counts on the tiles above cannot say whether the corpus is any good --
+    "23 screened" is a finished corpus or a backlog depending on facts they do
+    not carry. These five say it. They are shown side by side rather than
+    combined because a single number invites an argument about the weights, and
+    a referee will ask what is in it.
+    """
+    if not m["total"]:
+        return ""
+    rows = ""
+    for b in m["bars"]:
+        pct = b["pct"]
+        # Red below a third, amber below two thirds, green above. The point is
+        # to draw the eye to the row that needs work, not to grade anything.
+        hue = "#d9534f" if pct < 34 else ("#d9a441" if pct < 67 else "#5cb85c")
+        rows += f"""
+  <div class="qrow">
+    <div class="qlabel">{esc(b['label'])}<br><small>{esc(b['why'])}</small></div>
+    <div class="qtrack"><div class="qfill" style="width:{pct:.1f}%;background:{hue}"></div></div>
+    <div class="qnum">{b['n']}/{b['total']}<br><small>{pct:.0f}%</small></div>
+  </div>"""
+
+    f = m["flags"]
+    n_prov, n_subst = len(f["provenance"]), len(f["substantive"])
+    return f"""
+<div class="card"><h2>Can this corpus carry the claim?</h2>
+{rows}
+<p style="margin-top:1rem"><b>Open questions.</b> {n_prov + n_subst} of {m['total']}
+rows carry an unresolved flag, of two very different kinds:</p>
+<ul>
+  <li><b>{n_prov}</b> — a cited page could not be read (403, 404, timeout, video-only).
+      An access failure: fetch it better and it goes away.</li>
+  <li><b>{n_subst}</b> — the sources disagree, or do not say. A fact about the world;
+      only a person can settle it.</li>
+</ul>
+<p><small>Counting these together is why every row looked flagged and the warning
+carried no signal. Same numbers in a terminal:
+<code>python3 scoreboard.py quality</code></small></p></div>"""
 
 
 
