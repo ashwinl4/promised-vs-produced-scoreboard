@@ -37,6 +37,12 @@ PROVENANCE_COLUMNS: list[str] = pvp_schema.PROVENANCE_COLUMNS  # 4 provenance co
 ERROR = pvp_schema.ERROR
 WARN = pvp_schema.WARN
 
+# Missing values that arrived as text ('None', 'null', ...). The insert
+# paths use this to blank them; the checker uses it to catch any that
+# reached the database by some other route.
+NULL_STRINGS = pvp_schema.NULL_STRINGS
+DATE_COLUMN_NULL_STRINGS = pvp_schema.DATE_COLUMN_NULL_STRINGS
+
 # Sector vocabulary, from the ONE source of truth. `all_sectors()` is the live
 # vocabulary (base + runtime registry); `register_sector()` is the API-path
 # function that extends it without editing code.

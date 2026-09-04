@@ -150,6 +150,23 @@ TIER_TOKENS = {"V1", "V2", "P"}
 # Sentinel tokens allowed in first-output cells that carry no calendar date.
 DATE_SENTINELS = {"pending", "never", "unconfirmed", "n/a", "tbd", "open"}
 
+# A missing value that arrived as text. These are what a serializer writes when
+# it is handed nothing -- Python's str(None) is "None", JavaScript's is "null"
+# or "undefined" -- and they are not data, they are the absence of data wearing
+# its coat. Stored as-is they are worse than an empty cell, because every check
+# downstream sees a present value and waves it through. One reached the N=20
+# batch: promised_date_source held the four characters "None", and it was caught
+# only because that column happens to be URL-checked. In `current_status` or
+# `project` nothing would have noticed at all.
+NULL_STRINGS = {"none", "null", "nan", "nil", "undefined", "n/a", "na", "-", "--"}
+
+# In the two first-output columns some of those words are real answers rather
+# than absences: 'n/a' is a documented DATE_SENTINEL meaning "no calendar date".
+# Exempting the whole column was too broad -- it let 'None' stand in a date cell
+# too. Only the overlap is exempt, so a genuine sentinel survives and a
+# stringified null is still blanked wherever it lands.
+DATE_COLUMN_NULL_STRINGS = NULL_STRINGS - DATE_SENTINELS
+
 # The inclusion floor (updated per prompts/prompt_source_collected.md): a project must
 # clear EITHER announced capital >= $100M OR >= 200 promised jobs. A row is out
 # of scope only if it falls below BOTH floors. (This is the looser OR rule; the
@@ -268,6 +285,8 @@ def parse_lag(value: str) -> tuple[float | None, bool, str | None]:
         return None, True, None
     if v in ("-2", "-2.0"):   # "cancelled" -- promise never delivered
         return None, False, None
+    if v in ("-3", "-3.0"):   # "no promise recorded" -- nothing to measure against
+        return None, False, None
     is_open = ("+" in v) or ("open" in v.lower())
     num = "".join(ch for ch in v if ch.isdigit() or ch == ".")
     if num.count(".") > 1 or num == "":
@@ -293,6 +312,19 @@ def check_url(value: str) -> str | None:
 def validate_row(rownum: int, row: dict[str, str], has_prov: dict[str, bool]) -> list[Issue]:
     issues: list[Issue] = []
     project = (row.get("project") or "").strip() or "<no project>"
+
+    # A missing value that arrived as text, in ANY column. This runs first and
+    # over everything, because the failure it catches is a cell that looks
+    # populated to every check after it. `n/a` is a legitimate DATE_SENTINEL, so
+    # the two first-output columns are exempt -- there the word is a real answer.
+    for col, value in row.items():
+        bad = (DATE_COLUMN_NULL_STRINGS
+               if col in ("promised_first_output", "actual_first_output")
+               else NULL_STRINGS)
+        if isinstance(value, str) and value.strip().lower() in bad:
+            issues.append(Issue(rownum, project, col, ERROR,
+                                f"{value.strip()!r} is a missing value written as "
+                                "text; the cell should be empty"))
 
     def add(col: str, level: str, msg: str) -> None:
         issues.append(Issue(rownum, project, col, level, msg))

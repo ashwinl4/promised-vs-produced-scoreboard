@@ -47,9 +47,14 @@ from datetime import date
 # Numeric sentinels kept in the (float) lag/slip columns -- see module docstring.
 TO_BE_COMPLETED = -1.0
 CANCELLED = -2.0
+NO_PROMISE = -3.0
 
 # Map the float sentinel back to its standardized label (schema-level vocabulary).
-SENTINEL_LABELS = {TO_BE_COMPLETED: "to be completed", CANCELLED: "cancelled"}
+SENTINEL_LABELS = {
+    TO_BE_COMPLETED: "to be completed",
+    CANCELLED: "cancelled",
+    NO_PROMISE: "no promise recorded",
+}
 
 _CANCELLED_TOKENS = ("never", "cancel")  # 'cancel' also matches cancelled/canceled
 _PENDING_TOKENS = ("pending", "tbd", "unconfirmed", "n/a", "open", "unknown")
@@ -132,7 +137,17 @@ def compute_lag_slip(announced, promised, actual):
 
     If ``actual`` has no concrete date the pair is a sentinel: ``CANCELLED``
     (-2.0) when the promise was cancelled/never delivered, else ``TO_BE_COMPLETED``
-    (-1.0). ``slip`` also falls back to a sentinel when ``promised`` has no date.
+    (-1.0).
+
+    When ``promised`` has no date, ``slip`` is ``NO_PROMISE`` (-3.0) and NOT
+    ``TO_BE_COMPLETED``. Those are different facts and collapsing them corrupts
+    the estimand: -1.0 says "this project has not produced yet", which is the
+    right-censoring survival analysis is built to handle. But a project can have
+    produced -- a real ``actual_first_output`` -- and still carry no promised
+    date, because the source never stated one. Writing -1.0 there marked four
+    rows of the first N=20 batch as not-yet-produced when they had in fact
+    produced, which would have counted them as censored. There is nothing to
+    complete; there was never a promise to measure against.
     """
     a_iso, _a_kind = interpret_date(announced)
     p_iso, _p_kind = interpret_date(promised)
@@ -147,7 +162,7 @@ def compute_lag_slip(announced, promised, actual):
     # dates are inconsistent, lag comes out negative -- we return that (a negative
     # lag is visibly anomalous) rather than silently hiding a bad extraction.
     lag = _span_years(a_iso, x_iso) if a_iso else TO_BE_COMPLETED
-    slip = _span_years(p_iso, x_iso) if p_iso else TO_BE_COMPLETED
+    slip = _span_years(p_iso, x_iso) if p_iso else NO_PROMISE
     return a_iso, p_iso, x_iso, lag, slip
 
 

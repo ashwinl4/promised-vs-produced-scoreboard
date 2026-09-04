@@ -42,6 +42,7 @@ from pipeline import source, screen, verify, orchestrate as orch, llm  # noqa: E
 from pipeline.db import (  # noqa: E402
     DEFAULT_DB, TABLES, connect, db_path, init_db, table_counts,
 )
+from pipeline.dates import enrich as enrich_dates  # noqa: E402
 from pipeline.schema_check import (  # noqa: E402
     V0_COLUMNS,
     DERIVED_DATE_COLUMNS,
@@ -542,6 +543,50 @@ def cmd_screen_remove(conn, args):
         raise SystemExit(str(e))
     print(f"removed screen_extracted #{gone['id']} ({gone['project'] or 'no project name'})"
           f" and {gone['checks']} check(s)")
+
+
+def cmd_recompute(conn, args):
+    """Re-derive the five computed date cells on rows already in the database.
+
+    `enrich` is deterministic and idempotent and is the only place lag/slip and
+    the *_dt cells are ever computed -- but it runs on the way IN. A row written
+    before a rule changed keeps the old answer until something re-derives it,
+    and nothing did, because until now nothing needed to.
+
+    Something does now: slip_years used to say -1.0 ("not produced yet") for a
+    row that HAD produced but carried no promised date, and now says -3.0 ("no
+    promise recorded"). Rows written before that distinction existed still claim
+    to be censored when they are not.
+
+    Reads and rewrites only the derived cells. Nothing extracted, nothing a
+    human decided, and no source text is touched.
+    """
+    derived = list(DERIVED_DATE_COLUMNS) + ["lag_years", "slip_years"]
+    total = 0
+    for table in ("screen_extracted", "verify_verified"):
+        changed = []
+        for row in conn.execute(f"SELECT * FROM {table}").fetchall():
+            before = {c: row[c] for c in derived}
+            after = {c: v for c, v in enrich_dates(
+                {c: row[c] for c in V0_COLUMNS}).items() if c in derived}
+            if after == before:
+                continue
+            changed.append((row["id"], before, after))
+            if not args.dry_run:
+                conn.execute(
+                    f"UPDATE {table} SET {', '.join(c + ' = ?' for c in derived)} "
+                    "WHERE id = ?",
+                    [after[c] for c in derived] + [row["id"]])
+        for rid, before, after in changed:
+            diffs = ", ".join(f"{c}: {before[c]!r} -> {after[c]!r}"
+                              for c in derived if before[c] != after[c])
+            print(f"  {table} #{rid}  {diffs}")
+        total += len(changed)
+    if args.dry_run:
+        print(f"dry run -- {total} row(s) would change. Re-run without --dry-run to write.")
+    else:
+        conn.commit()
+        print(f"recomputed {total} row(s).")
 
 
 def cmd_count(conn, args):
@@ -1385,6 +1430,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--yes", action="store_true", required=True,
                    help="required: this deletes a row, and there is no undo")
     s.set_defaults(fn=cmd_screen_remove)
+
+    s = sub.add_parser("recompute",
+                       help="re-derive lag/slip and the *_dt cells on stored rows")
+    s.add_argument("--dry-run", action="store_true",
+                   help="show what would change and write nothing")
+    s.set_defaults(fn=cmd_recompute)
 
     s = sub.add_parser("count",
                        help="print one number: how many rows a stage holds")

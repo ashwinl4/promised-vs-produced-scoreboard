@@ -12,6 +12,20 @@ from __future__ import annotations
 import sqlite3
 
 from pipeline.db import now_iso
+from pipeline.schema_check import NULL_STRINGS
+
+
+def _clean(value: str | None) -> str | None:
+    """Trim, and treat a missing value written as text as the absence it is.
+
+    Source cells are URLs and prose, so 'None' or 'null' here is never a real
+    answer -- it is str(None) from whatever handed the lead over. Blanking it at
+    the door keeps a cell that only looks populated out of the database.
+    """
+    v = (value or "").strip()
+    if not v or v.lower() in NULL_STRINGS:
+        return None
+    return v
 
 
 def insert_lead(
@@ -46,9 +60,9 @@ def insert_lead(
             now_iso(),
             promise_source,
             status_source,
-            (promised_date_source or "").strip() or None,
-            (summary or "").strip() or None,
-            (collected_via or "").strip() or None,
+            _clean(promised_date_source),
+            _clean(summary),
+            _clean(collected_via),
         ),
     )
     conn.commit()

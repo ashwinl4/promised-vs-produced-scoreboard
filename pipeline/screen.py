@@ -21,6 +21,8 @@ from pipeline.dates import enrich as enrich_dates, DATE_TRIPLES
 from pipeline.schema_check import (
     V0_COLUMNS,
     INT_COLUMNS,
+    NULL_STRINGS,
+    DATE_COLUMN_NULL_STRINGS,
     DERIVED_DATE_COLUMNS,
     RAW_DATE_COLUMNS,
     check_row,
@@ -28,12 +30,26 @@ from pipeline.schema_check import (
 
 
 def _coerce(col: str, value) -> object:
-    """Normalise a cell for storage: '' -> NULL; the two int columns -> int."""
+    """Normalise a cell for storage: '' -> NULL; the two int columns -> int.
+
+    A missing value written as text ('None', 'null', 'undefined') is blanked
+    here, at the door, rather than stored and flagged later. It is not data --
+    it is what a serializer emits when handed nothing -- and stored as-is it
+    reads as a populated cell to everything downstream. The two first-output
+    columns exempt only the overlap with the date sentinels: there 'n/a' is a
+    documented DATE_SENTINEL meaning "no calendar date", a real answer -- but
+    'None' is not, and must be blanked there too.
+    """
     if value is None:
         return None
     if isinstance(value, str):
         value = value.strip()
         if value == "":
+            return None
+        bad = (DATE_COLUMN_NULL_STRINGS
+               if col in ("promised_first_output", "actual_first_output")
+               else NULL_STRINGS)
+        if value.lower() in bad:
             return None
     if col in INT_COLUMNS and value is not None:
         s = str(value).replace(",", "").replace("_", "").replace("$", "").strip()
