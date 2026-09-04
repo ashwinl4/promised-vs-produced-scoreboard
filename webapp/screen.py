@@ -278,14 +278,17 @@ def screen_inspect(screen_id: int, msg: Optional[str] = None):
     )
 
     if promotable:
+        # No tier picker, for the reason spelled out in cmd_review: this page
+        # shows the promise and the status, which are two halves of the row and
+        # not two readings of one claim, so V2 was never answerable from what
+        # is on screen. The CLI queue stamps V1 too; a picker here would be the
+        # same non-choice in the other interface. Deliberate V2 goes through
+        # `verify-promote --tier V2` once a second source has actually been found.
         promote_controls = """
-    <div class="grid2">
-      <div><label>verification_tier for Verify</label>
-        <select name="tier">
-          <option value="V1">V1 — checked against one source</option>
-          <option value="V2">V2 — two independent sources</option>
-        </select></div>
-    </div>
+    <input type="hidden" name="tier" value="V1">
+    <p class="msg">Publishes as <b>tier V1</b> — one source checked. For V2, find a
+    second independent source, then run
+    <code>verify-promote --screen-id N --tier V2</code>.</p>
     <label>Reason — required only if you changed a cell (recorded in <code>verify_edits</code>)</label>
     <input type="text" name="edit_description"
            placeholder="e.g. corrected announced date to match the filing">

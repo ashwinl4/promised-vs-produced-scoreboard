@@ -349,6 +349,8 @@ def cmd_review(conn, args):
     print("Open each row's two links, then answer from what they say.")
     print("y = the source supports it, n = it does not, s = skip, q = stop.")
     print("Nothing is written until you confirm at the end of a row.")
+    print("Rows publish as tier V1 (one source checked). For V2, find a second")
+    print(f"independent source yourself, then: {ENTRY} verify-promote --tier V2")
 
     done = skipped = 0
     try:
@@ -399,12 +401,20 @@ def cmd_review(conn, args):
                 print("          --set promised_jobs=<correct> --flag \"...\"")
                 continue
 
-            print()
-            depth = _ask("checked against one source or two independent ones?", "12q")
-            if depth == "q":
-                break
-            tier = "V1" if depth == "1" else "V2"
-            reason = _ask_text("In one sentence, what resolved it?")
+            # Every row published from this queue is V1 -- one source checked.
+            #
+            # V2 means a second, INDEPENDENT source confirmed the same fact.
+            # This screen shows two links, but they are the promise and the
+            # status: two documents covering two halves of the row, not two
+            # readings of one claim. Reading both is simply doing the review.
+            # Nothing here helps you find a corroborating source, so the
+            # question could only ever be answered "1" -- and asking it made
+            # the tier column look like a judgment when it was a formality.
+            #
+            # V2 is now a deliberate act, for the rows worth the extra work:
+            # go find the second source, then `verify-promote --tier V2`.
+            tier = "V1"
+            reason = _ask_text("What convinced you? (one line, saved with the row)")
 
             print()
             print(f"  python3 {ENTRY} verify-promote --screen-id {sid} "

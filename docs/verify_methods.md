@@ -76,7 +76,15 @@ python3 -m pipeline.cli verify-promote --screen-id N --tier V1
 Use `--set col=value` to correct a cell at promotion time (e.g. fix a date the
 checker flagged), and `--tier V1/P` when the announcement is verified but first
 output is still provisional. Use `V2` only when you checked two genuinely
-independent sources. The `flag` is rewritten into a resolution record on the way
+independent sources.
+
+**The guided queue always writes V1.** `review` and the web app's inspect page
+both show you the promise and the status — two documents covering two halves of
+the row, not two readings of one claim — so reading what they put in front of you
+is one source, however many links you clicked. Neither screen helps you find a
+corroborating source, so neither offers the choice: they used to ask, and the
+honest answer was always V1. `V2` is a deliberate act. Go find the second source,
+then promote that row with `verify-promote --tier V2` by hand. The `flag` is rewritten into a resolution record on the way
 in. A `FAIL`ing row is blocked unless you pass `--force` — reserve that for when
 you've verified the row by hand and disagree with the checker.
 
