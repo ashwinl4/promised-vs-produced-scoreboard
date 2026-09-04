@@ -560,12 +560,28 @@ def cmd_source_collect(conn, args):
 
 
 def cmd_source_list(conn, args):
-    rows = source.list_leads(conn)
+    screened = source.screened_map(conn)
+    rows = source.unscreened_leads(conn) if args.unscreened else source.list_leads(conn)
     if not rows:
-        print("(no source leads)")
+        print("(no unscreened source leads)" if args.unscreened else "(no source leads)")
+        return
+
+    # --brief is what the Screen stage reads when it is choosing what to work
+    # on next. The full listing is four lines of prose per lead; at 25 leads
+    # that is a screenful to answer "which ones are left", and every line of it
+    # is re-read on every later turn of the same call.
+    if args.brief:
+        for r in rows:
+            done = screened.get(r["id"])
+            mark = f"screen #{', #'.join(str(i) for i in done)}" if done else "unscreened"
+            print(f"  #{r['id']:>3}  {mark:<14}  {(r['summary'] or '')[:88]}")
+        return
+
     for r in rows:
         via = r["collected_via"]
-        print(f"[source #{r['id']}]{f'  via={via}' if via else ''} {r['summary'] or ''}")
+        done = screened.get(r["id"])
+        state = f"  -> screen #{', #'.join(str(i) for i in done)}" if done else "  (unscreened)"
+        print(f"[source #{r['id']}]{f'  via={via}' if via else ''}{state} {r['summary'] or ''}")
         print(f"  promise: {r['promise_source']}")
         print(f"  status : {r['status_source']}")
         if r["promised_date_source"]:
@@ -1534,7 +1550,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("source-collect", help="[API] collect one new Source lead from the web") \
         .set_defaults(fn=cmd_source_collect)
-    sub.add_parser("source-list", help="list Source leads").set_defaults(fn=cmd_source_list)
+    s = sub.add_parser("source-list", help="list Source leads")
+    s.add_argument("--unscreened", action="store_true",
+                   help="only leads with no Screen row yet -- Screen's work queue")
+    s.add_argument("--brief", action="store_true",
+                   help="one line per lead (id, screening state, short summary)")
+    s.set_defaults(fn=cmd_source_list)
 
     # Screen
     s = sub.add_parser("screen-add", help="[manual] add a Screen row from JSON")

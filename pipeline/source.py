@@ -69,6 +69,36 @@ def insert_lead(
     return int(cur.lastrowid)
 
 
+def screened_map(conn: sqlite3.Connection) -> dict[int, list[int]]:
+    """{source lead id: [screen row ids extracted from it]}.
+
+    A lead missing from this map has never been screened, which is the only
+    question the Screen stage needs to ask of a lead before picking it up.
+    """
+    out: dict[int, list[int]] = {}
+    for child, parent in conn.execute(
+        "SELECT id, source_collected_id FROM screen_extracted "
+        "WHERE source_collected_id IS NOT NULL ORDER BY id"
+    ):
+        out.setdefault(int(parent), []).append(int(child))
+    return out
+
+
+def unscreened_leads(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Leads with no Screen row yet -- the Screen stage's actual work queue.
+
+    Screen used to find these by listing every lead and cross-referencing the
+    Screen table by eye, which costs turns and fills the context with rows it is
+    not going to touch. One lead is one Screen row (see screen.insert_extracted),
+    so "has a Screen row" is the whole test.
+    """
+    return conn.execute(
+        "SELECT * FROM source_collected s WHERE NOT EXISTS "
+        "(SELECT 1 FROM screen_extracted e WHERE e.source_collected_id = s.id) "
+        "ORDER BY s.id"
+    ).fetchall()
+
+
 def list_leads(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
         "SELECT * FROM source_collected ORDER BY id"
