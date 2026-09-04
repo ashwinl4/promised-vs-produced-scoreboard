@@ -34,7 +34,22 @@ trap 'echo; echo "interrupted -- stopping the loop."; exit 130' INT TERM
 PROMPT_FILE="${PROMPT_FILE:-collect/prompts/prompt1_collect_recent.md}"
 COUNT_TABLE="${COUNT_TABLE:-source_collected}"   # which stage's rows we're adding to
 ADD="${ADD:-10}"                                  # how many NEW rows to add to COUNT_TABLE this run
-MAX_ITERS="${MAX_ITERS:-200}"                     # hard safety cap on loop turns
+# The cap bounds COST, not liveness -- MAX_STALL below is the liveness check.
+# It exists for the case MAX_STALL cannot see: steady but slow progress. `stall`
+# resets on every success, so a run adding one row every four turns never trips
+# it while paying four calls per row. Only this cap bounds that.
+#
+# It scales with ADD rather than sitting at a flat number, because "too many
+# turns" depends on how many rows were asked for. A flat 200 silently truncated
+# any run wanting more than ~66. Non-numeric or tiny values fall back to a floor
+# so the loop can never be capped at zero -- BSD seq counts DOWN for `seq 1 0`,
+# which would run two turns with i=1 then i=0.
+case "$ADD" in
+  ''|*[!0-9]*) _iters_default=30 ;;
+  *) _iters_default=$(( ADD * 3 ))
+     [ "$_iters_default" -lt 30 ] && _iters_default=30 ;;
+esac
+MAX_ITERS="${MAX_ITERS:-$_iters_default}"         # cost cap on loop turns
 MAX_STALL="${MAX_STALL:-3}"                       # stop after this many no-progress iterations in a row
 MODEL="${MODEL:-claude-opus-4-8}"
 # NOTE: the print-mode `--effort` flag only accepts low|medium|high -- there is no
@@ -90,11 +105,12 @@ START="$(count)"; START="${START:-0}"
 echo "loop: prompt=$PROMPT_FILE  add $ADD to $COUNT_TABLE (now $START)  (model=$MODEL, effort=$EFFORT)"
 
 stall=0
+hit_cap=1        # cleared by either deliberate exit below
 for i in $(seq 1 "$MAX_ITERS"); do
   now="$(count)"; now="${now:-0}"
   added=$(( now - START ))
   echo "=== iter $i - added $added/$ADD this run ($COUNT_TABLE=$now) ==="
-  [ "$added" -ge "$ADD" ] && { echo "added $ADD this run; stopping."; break; }
+  [ "$added" -ge "$ADD" ] && { echo "added $ADD this run; stopping."; hit_cap=0; break; }
 
   # One fresh process. The operating prompt goes in the system prompt (works for
   # prompt1 OR prompt2). docs/cli.md is attached as context via an @-mention
@@ -118,10 +134,29 @@ for i in $(seq 1 "$MAX_ITERS"); do
   if [ "$after" -le "$now" ]; then
     stall=$(( stall + 1 ))
     echo "  (no new rows this iteration; stall $stall/$MAX_STALL)"
-    [ "$stall" -ge "$MAX_STALL" ] && { echo "no new leads in $MAX_STALL iterations; stopping."; break; }
+    [ "$stall" -ge "$MAX_STALL" ] && { echo "no new leads in $MAX_STALL iterations; stopping."; hit_cap=0; break; }
   else
     stall=0
   fi
 done
+
+# Running out of turns used to look exactly like finishing: the `for` simply
+# ended and the same "done." line printed. Say it, loudly, or a truncated run
+# reads as a complete one. NOT an error exit -- the stage did real work, and
+# all.sh skips Screen when Source exits non-zero, which would strand every row
+# this run collected.
+if [ "$hit_cap" = "1" ]; then
+  final="$(count)"; final="${final:-0}"
+  echo
+  echo "!! ==================================================================="
+  echo "!!  STOPPED AT THE ITERATION CAP -- THIS RUN IS INCOMPLETE"
+  echo "!!"
+  echo "!!    added $(( final - START ))/$ADD rows in $MAX_ITERS turns"
+  echo "!!"
+  echo "!!  Re-run with a higher MAX_ITERS. Nothing is collected twice: the"
+  echo "!!  database de-duplicates, so a re-run continues where this stopped."
+  echo "!! ==================================================================="
+  echo
+fi
 
 echo "done. Final:"; "$PY" -m pipeline.cli status

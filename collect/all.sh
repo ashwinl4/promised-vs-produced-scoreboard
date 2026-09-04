@@ -30,7 +30,7 @@
 #     ONLY         source | screen | both                    (default both)
 #     MODEL        Claude model each iteration runs          (default claude-opus-4-8)
 #     EFFORT       low | medium | high                       (default high)
-#     MAX_ITERS    hard cap on loop turns per stage          (default 200)
+#     MAX_ITERS    cost cap on loop turns per stage          (default 3x ADD)
 #     MAX_STALL    give up after N no-progress iterations    (default 3)
 #     VERBOSE      1 = stream tool calls                     (default 0)
 #     PROMPT_FILE  operating prompt for the stage            (per-stage defaults)
@@ -93,14 +93,21 @@ count() {
 # settings can never leak into the Screen stage.
 run_stage() {
   local stage="$1" script="$2" default_prompt="$3" default_table="$4" preflight="$5"
-  local add prompt table model effort iters stall verbose
+  local add prompt table model effort iters stall verbose iters_default
 
   add="$(stage_cfg   "$stage" ADD         "$N")"
   prompt="$(stage_cfg "$stage" PROMPT_FILE "$default_prompt")"
   table="$(stage_cfg "$stage" COUNT_TABLE "$default_table")"
   model="$(stage_cfg "$stage" MODEL       "claude-opus-4-8")"
   effort="$(stage_cfg "$stage" EFFORT     "high")"
-  iters="$(stage_cfg "$stage" MAX_ITERS   "200")"
+  # Default scales with the rows asked for; see the note in source.sh. A flat
+  # 200 here shadowed source.sh's own default, so N=300 capped at 200 silently.
+  case "$add" in
+    ''|*[!0-9]*) iters_default=30 ;;
+    *) iters_default=$(( add * 3 ))
+       [ "$iters_default" -lt 30 ] && iters_default=30 ;;
+  esac
+  iters="$(stage_cfg "$stage" MAX_ITERS   "$iters_default")"
   stall="$(stage_cfg "$stage" MAX_STALL   "3")"
   verbose="$(stage_cfg "$stage" VERBOSE   "0")"
 
