@@ -21,15 +21,16 @@ import sqlite3
 from pipeline import source, screen, verify, llm
 
 
-def existing_project_names(conn: sqlite3.Connection) -> list[str]:
-    """Project names already PUBLISHED in the verify table (`verify_verified`).
+def published_project_names(conn: sqlite3.Connection) -> list[str]:
+    """Names of the projects already published, from the verify table.
 
-    This is the authoritative "already covered, don't collect these" set the
-    source collector is steered away from. It is read straight from the verify
-    scoreboard -- the pipeline's final product -- NOT from Source/Screen: verify is the
-    single authority for "already have it," and dedup of in-flight Source/Screen
-    leads is a later-stage concern. Fed to `llm.render_source_prompt` (both the
-    Claude Code and the direct-API path) as the live exclusion list."""
+    These are the finished, human-checked rows -- the Scoreboard's actual
+    product -- so this is the authoritative "we already have this one, do not
+    collect it again" list. It deliberately reads only the verify table:
+    projects that are merely collected and not yet published are the other
+    function's job (`unpublished_project_names`). Passed to
+    `llm.render_source_prompt` as the live exclusion list, on every path that
+    renders that prompt."""
     names = set()
     for r in conn.execute("SELECT project FROM verify_verified").fetchall():
         if r["project"]:
@@ -37,18 +38,18 @@ def existing_project_names(conn: sqlite3.Connection) -> list[str]:
     return sorted(names)
 
 
-_SUMMARY_DASH = re.compile(r"\s+(?:\u2014|\u2013|--)\s+")
-_SUMMARY_STOP = re.compile(r"(?<=[a-z0-9)])\.\s+(?=[A-Z])")
+_TITLE_DASH = re.compile(r"\s+(?:\u2014|\u2013|--)\s+")
+_SENTENCE_END = re.compile(r"(?<=[a-z0-9)])\.\s+(?=[A-Z])")
 
 
-def _summary_head(summary: str, floor: int = 80, cap: int = 140) -> str:
-    """The identifying head of a Source summary, for use as an exclusion entry.
+def _shorten_summary(summary: str, floor: int = 80, cap: int = 140) -> str:
+    """Shorten a Source summary to just the part that identifies the project.
 
     Source rows carry no project name, so the summary is their only identifier
-    -- but it is written for a human reader and averages ~310 characters. Every
-    source worker reads the whole exclusion list on every iteration, so a long
-    run pays for that length once per row per iteration: at N=300 the untrimmed
-    summaries cost ~2.5M tokens more than their heads do.
+    -- but it is written for a human reader and averages ~310 characters. The
+    exclusion list is re-read in full on every round of collection, so each
+    entry is paid for once per round: at N=300 the untrimmed summaries cost
+    ~2.5M tokens more than their shortened forms do.
 
     Collectors write summaries as `Title -- prose. Operator: X.`, and that title
     ("Eli Lilly Houston API Plant") makes a better entry than the prose. It is
@@ -57,7 +58,7 @@ def _summary_head(summary: str, floor: int = 80, cap: int = 140) -> str:
     one Eli Lilly plant from another. A title shorter than `floor` is not
     trusted to stand alone ("Nucor plate mill" leaves the town on the far side
     of the dash), so those read on to the floor instead; measured over the
-    archived corpus that lifts entries retaining a place name from 46% to 73%,
+    archived corpus that lifts entries keeping a place name from 46% to 73%,
     at 42% of the full summary length rather than 30%. Summaries written in
     some other shape fall back to the first sentence, then to a word-boundary
     cut at `cap`.
@@ -65,12 +66,12 @@ def _summary_head(summary: str, floor: int = 80, cap: int = 140) -> str:
     summary = (summary or "").strip()
     if not summary:
         return ""
-    for pattern in (_SUMMARY_DASH, _SUMMARY_STOP):
+    for pattern in (_TITLE_DASH, _SENTENCE_END):
         m = pattern.search(summary)
         # Ignore a match so early it cannot be a title (a stray "--"), or so
         # late that keeping only the head would save nothing.
         if m and 8 <= m.start() <= cap:
-            end = m.start() + (1 if pattern is _SUMMARY_STOP else 0)
+            end = m.start() + (1 if pattern is _SENTENCE_END else 0)
             if end >= floor:
                 return summary[:end].strip()
             # Title too terse to stand alone ("Nucor plate mill" when the town
@@ -82,24 +83,25 @@ def _summary_head(summary: str, floor: int = 80, cap: int = 140) -> str:
     return summary[:cut if cut > floor else cap].rstrip() + "\u2026"
 
 
-def inflight_project_hints(conn: sqlite3.Connection) -> list[str]:
-    """Identifiers for leads already in flight in Source/Screen but not yet in Verify.
+def unpublished_project_names(conn: sqlite3.Connection) -> list[str]:
+    """Names of projects already collected but not yet published.
 
-    Verify is a human-only gate, so `verify_verified` stays empty during automated
-    collection. If the source collector saw only the verify exclusion list, it would
-    re-collect the same top project on every iteration -- the duplicate-source bug.
-    These hints -- Screen `project` names, plus the identifying head of the
-    `summary` for source rows not yet screened (source rows have no project
-    name of their own; see `_summary_head`) -- are what actually stop duplicate
-    collection within and across `gather` runs. Because `source.insert_lead`
-    commits immediately, a lead collected earlier in the same batch is already
-    visible here on the next call. Fed to `llm.render_source_prompt` alongside the
-    verify list, under a distinct "already in flight" section."""
-    hints = set()
+    Publishing is a human decision, so during a collection run the verify table
+    stays empty however many projects have been found. If the collector were
+    shown only the published list, it would find the same obvious project over
+    and over. This list is what actually prevents that.
+
+    A project appears here under its Screen `project` name once it has been
+    extracted, and before that under a shortened form of its Source `summary`,
+    because Source rows carry no name of their own (see `_shorten_summary`).
+    Because a collected lead is saved immediately, one found a minute ago is
+    already in this list for the next round. Passed to
+    `llm.render_source_prompt` beside the published list, as its own section."""
+    names = set()
     for r in conn.execute("SELECT project FROM screen_extracted").fetchall():
         project = (r["project"] or "").strip()
         if project:
-            hints.add(project)
+            names.add(project)
     # Summaries only for leads that have not been screened yet: once a lead
     # reaches Screen it has a `project` name for the same site, and listing
     # both names the project twice.
@@ -107,10 +109,10 @@ def inflight_project_hints(conn: sqlite3.Connection) -> list[str]:
         "SELECT summary FROM source_collected s WHERE NOT EXISTS "
         "(SELECT 1 FROM screen_extracted e WHERE e.source_collected_id = s.id)"
     ).fetchall():
-        summary = _summary_head(r["summary"] or "")
+        summary = _shorten_summary(r["summary"] or "")
         if summary:
-            hints.add(summary)
-    return sorted(hints)
+            names.add(summary)
+    return sorted(names)
 
 
 def filter_by_thresholds(
@@ -153,8 +155,8 @@ def run_source_ai(conn: sqlite3.Connection) -> tuple[int, dict]:
     Returns (source_id, lead_dict). Raises llm.LLMUnavailable on failure.
     """
     lead = llm.collect_source_lead(
-        avoid_projects=existing_project_names(conn),
-        avoid_inflight=inflight_project_hints(conn),
+        avoid_published=published_project_names(conn),
+        avoid_unpublished=unpublished_project_names(conn),
     )
     bid = source.insert_lead(
         conn,

@@ -121,8 +121,8 @@ def source_prompt_page():
     conn = _conn()
     try:
         prompt = llm.render_source_prompt(
-            avoid_projects=orch.existing_project_names(conn),
-            avoid_inflight=orch.inflight_project_hints(conn),
+            avoid_published=orch.published_project_names(conn),
+            avoid_unpublished=orch.unpublished_project_names(conn),
         )
     finally:
         conn.close()

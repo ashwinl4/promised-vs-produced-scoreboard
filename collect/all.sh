@@ -28,11 +28,11 @@
 #
 #     N            how many rows to add at each stage        (default 10)
 #     ONLY         source | screen | both                    (default both)
-#     MODEL        Claude model for the workers              (default claude-opus-4-8)
+#     MODEL        Claude model each iteration runs          (default claude-opus-4-8)
 #     EFFORT       low | medium | high                       (default high)
 #     MAX_ITERS    hard cap on loop turns per stage          (default 200)
 #     MAX_STALL    give up after N no-progress iterations    (default 3)
-#     VERBOSE      1 = stream the worker's tool calls        (default 0)
+#     VERBOSE      1 = stream tool calls                     (default 0)
 #     PROMPT_FILE  operating prompt for the stage            (per-stage defaults)
 #     COUNT_TABLE  table the stage counts                    (per-stage defaults)
 #
@@ -43,8 +43,8 @@
 #     PREFLIGHT=0      skip the "is claude authenticated?" probe entirely
 #     CONTINUE_ON_FAIL=1  run Screen even if Source exited non-zero
 #
-# NOTE ON COST: each stage spawns one fresh headless Claude Code worker per
-# iteration, so `N=10` on both stages is ~20+ worker calls. Start small.
+# NOTE ON COST: each stage starts one `claude -p` process per iteration, so
+# `N=10` on both stages is ~20+ runs. Start small.
 #
 set -euo pipefail
 

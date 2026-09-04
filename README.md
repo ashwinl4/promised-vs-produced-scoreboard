@@ -165,8 +165,8 @@ One command finds new projects and extracts them into rows:
 python3 scoreboard.py collect --n 10
 ```
 
-Each iteration starts a fresh headless Claude Code worker that searches the web
-and writes through the CLI, so this path needs the `claude` CLI installed and
+Each iteration starts one `claude -p` process that searches the web and writes
+through the CLI, so this path needs the `claude` CLI installed and
 logged in once (run `claude`, then `/login`). It checks that before it starts.
 Stopping with Ctrl-C is safe, and re-running picks up where you left off because
 the database de-duplicates.
@@ -177,8 +177,8 @@ Check the plan before spending anything:
 python3 scoreboard.py collect --n 5 --dry-run
 ```
 
-Each stage starts one worker per iteration, so `--n 10` across both stages is 20
-or more worker calls. Start small.
+Each stage starts one process per iteration, so `--n 10` across both stages is 20
+or more runs. Start small.
 
 ### Four ways in, and only two of them need Anthropic
 
@@ -267,7 +267,7 @@ Each of the three pipeline directories has its own README.
 |---|---|
 | [`scoreboard.py`](scoreboard.py) | **The entry point.** A thin launcher for the pipeline CLI. |
 | [`pipeline/`](pipeline/) | **The pipeline.** The five tables, the commands, and the promotion gate. `collect/`, `tools/` and the web app all write through it. Also holds `schema.py`, which defines the columns, the sector list, and the size floor. |
-| [`collect/`](collect/) | **Ongoing collection.** The loops that find new projects and extract them, and the prompts they hand to each worker. |
+| [`collect/`](collect/) | **Ongoing collection.** The loops that find new projects and extract them, and the prompts they hand to each one. |
 | [`webapp/`](webapp/) | The browser interface, for reviewing rows against their sources and promoting them. |
 | [`tools/`](tools/) | Scripts for an existing database. Two are also CLI commands: `export` and `coverage`. The other two, bulk CSV load and batch collection over the API, stay scripts because they are rare and sharp. |
 | [`outputs/`](outputs/) | `scoreboard.db`, plus `csv_tables/` holding a flat CSV export of each stage. |

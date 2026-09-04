@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 #
-# source.sh -- drive PROMPT 1 (or PROMPT 2) as repeated, fresh, stateless
+# source.sh -- drive PROMPT 1 (or PROMPT 2) as repeated, independent
 # Claude Code calls until ADD new rows have been added THIS RUN.
 #
 # HOW IT WORKS (the "outer loop"):
 #   It notes the starting row count for COUNT_TABLE, then each iteration...
 #     1. reads the current count from `pipeline.cli status`,
 #     2. stops once (current - starting) >= ADD, i.e. ADD rows were added this run,
-#     3. launches ONE headless Claude Code worker (`claude -p ...`) that actually
+#     3. launches ONE `claude -p` process that actually
 #        does the job -- web-searches, collects, and writes to scoreboard.db using
-#        the real pipeline CLI. The worker is a brand-new process every time, so no
+#        the real pipeline CLI. It is a brand-new process every time, so no
 #        context bleeds between runs (see prompts/README.md, "no chat history").
-#   This script is JUST the loop; Claude Code is the worker inside each turn.
+#   This script is JUST the loop; the `claude` CLI does the work each turn.
 #
 # WHY IT DOESN'T DOUBLE-COLLECT:
-#   Every `source-add` commits immediately, and each worker re-runs `source-prompt`
-#   first -- which re-reads the DB (verify + in-flight source/screen) -- so each run
+#   Every `source-add` commits immediately, and each iteration re-runs `source-prompt`
+#   first -- which re-reads the DB (published + already collected) -- so each run
 #   automatically steers around everything collected so far.
 #
 # RUN IT (from anywhere; it cd's to scoreboard/ itself. bash on macOS/Linux/WSL):
@@ -27,7 +27,7 @@
 set -euo pipefail
 
 # Stop cleanly on Ctrl-C / terminal close instead of rolling into the next
-# iteration. (Without this, the worker's `|| echo` below swallows the interrupt.)
+# iteration. (Without this, the `|| echo` below swallows the interrupt.)
 trap 'echo; echo "interrupted -- stopping the loop."; exit 130' INT TERM
 
 # --- Config (override any of these via env) -------------------------------- #
@@ -40,7 +40,7 @@ MODEL="${MODEL:-claude-opus-4-8}"
 # NOTE: the print-mode `--effort` flag only accepts low|medium|high -- there is no
 # "extra high" from the CLI. `high` is the ceiling here.
 EFFORT="${EFFORT:-high}"
-VERBOSE="${VERBOSE:-0}"   # 1 = stream the worker's tool calls/text live (JSON firehose)
+VERBOSE="${VERBOSE:-0}"   # 1 = stream tool calls/text live (JSON firehose)
 
 # --- Locate scoreboard/ and the tools --------------------------------- #
 cd "$(dirname "$0")/.."                            # collect/ -> scoreboard/
@@ -49,7 +49,7 @@ CLAUDE="$(command -v claude || echo "$HOME/.local/bin/claude")"
 [ -x "$CLAUDE" ] || { echo "ERROR: claude CLI not found ($CLAUDE)"; exit 1; }
 
 # Some systems ship only `python3`, but the prompts/README call bare `python`.
-# Put a `python` -> python3 shim on PATH for the worker (no system change).
+# Put a `python` -> python3 shim on PATH for the process (no system change).
 if ! command -v python >/dev/null 2>&1; then
   SHIM="$(mktemp -d)"; ln -s "$PY" "$SHIM/python"; export PATH="$SHIM:$PATH"
   trap 'rm -rf "$SHIM"' EXIT
@@ -96,14 +96,14 @@ for i in $(seq 1 "$MAX_ITERS"); do
   echo "=== iter $i - added $added/$ADD this run ($COUNT_TABLE=$now) ==="
   [ "$added" -ge "$ADD" ] && { echo "added $ADD this run; stopping."; break; }
 
-  # One fresh worker. The operating prompt goes in the system prompt (works for
+  # One fresh process. The operating prompt goes in the system prompt (works for
   # prompt1 OR prompt2). docs/cli.md is attached as context via an @-mention
   # (like clicking a file into context in the IDE) rather than read with a tool.
   # --allowedTools pre-approves tools so nothing stalls on a permission prompt.
   #
   # docs/cli.md is the command reference and nothing else, so the attachment is
   # scoped by construction. The two guardrails below still have to be said: with
-  # Bash pre-approved above, a worker could otherwise re-launch the loop that
+  # Bash pre-approved above, the process could otherwise re-launch the loop that
   # started it, and Verify is a human-only gate.
   "$CLAUDE" -p "@docs/cli.md is attached as reference context -- it is this pipeline's CLI reference. Never run a shell script from collect/ (that is the loop that launched you), and never promote to Verify (verify-promote / --promote-tier) -- that is a human-only gate. Now carry out your operating instructions (in the system prompt) to completion using the real pipeline CLI. Do only what those instructions say." \
     --model "$MODEL" \
@@ -112,7 +112,7 @@ for i in $(seq 1 "$MAX_ITERS"); do
     --allowedTools "Bash Read Write WebSearch WebFetch" \
     --permission-mode acceptEdits \
     ${VERBOSE_FLAGS[@]+"${VERBOSE_FLAGS[@]}"} \
-    || echo "  ! iteration $i worker exited non-zero; continuing."
+    || echo "  ! iteration $i failed; continuing."
 
   after="$(count)"; after="${after:-0}"
   if [ "$after" -le "$now" ]; then

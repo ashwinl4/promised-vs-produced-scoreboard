@@ -126,7 +126,7 @@ def cmd_webapp(conn, args):
               "have no authentication.", flush=True)
 
     # The app is named as a string rather than imported. uvicorn resolves it in
-    # the worker process, which is what --reload needs, and it keeps this module
+    # the reloading child process, which is what --reload needs, and it keeps
     # from importing its sibling webapp package.
     uvicorn.run("webapp.main:app", host=args.host, port=args.port, reload=args.reload)
 
@@ -163,8 +163,8 @@ def _landing(conn, prog: str) -> None:
         print(f"  N=5 bash {cyan('collect/all.sh')}"
               "             do it")
         print()
-        print("It runs headless Claude Code workers, so the `claude` CLI has to be")
-        print("installed and logged in once.")
+        print("It drives the `claude` CLI, so that has to be installed and")
+        print("logged in once. For any other assistant, see `source-prompt`.")
     else:
         print("Try one of these:")
         print(f"  {prog} {cyan('verify-list')}     the published data")
@@ -220,7 +220,7 @@ def cmd_collect(conn, args):
     if args.continue_on_fail:
         env["CONTINUE_ON_FAIL"] = "1"
 
-    # The loop spawns workers that write through this same CLI, and each of
+    # The loop starts processes that write through this same CLI, and each of
     # those closes its own connection, so the CSV exports stay current without
     # this process doing anything. Hand ours back before replacing the process.
     conn.close()
@@ -309,8 +309,8 @@ def _ask_text(prompt: str) -> str:
 
 
 def cmd_review(conn, args):
-    # Interactive by definition. The collection loops shell out to this CLI from
-    # headless workers, so blocking on input without a terminal would hang them.
+    # Interactive by definition. The collection loops shell out to this CLI
+    # with no terminal attached, so blocking on input would hang them.
     if not sys.stdin.isatty():
         raise SystemExit(
             "review needs a terminal, and stdin is not one.\n"
@@ -466,8 +466,8 @@ def cmd_source_prompt(conn, args):
     # Print the Source operating prompt to run in Claude Code (web search).
     # No API key needed: run it there, then feed the JSON back with `source-add --json -`.
     print(llm.render_source_prompt(
-        avoid_projects=orch.existing_project_names(conn),
-        avoid_inflight=orch.inflight_project_hints(conn),
+        avoid_published=orch.published_project_names(conn),
+        avoid_unpublished=orch.unpublished_project_names(conn),
     ))
 
 
@@ -1047,16 +1047,15 @@ def _command_examples() -> dict:
   {ENTRY} collect --only screen       extract leads already collected
 
 {_H}this one spends money{_H}
-  Each iteration starts a fresh headless Claude Code worker that searches
-  the web and writes through this CLI. Each stage runs one worker per row,
-  so --n 10 across both stages is twenty or more worker calls. Start small,
-  and use --dry-run first.
+  Each iteration starts one `claude -p` process that searches the web and
+  writes through this CLI. Each stage runs one per row, so --n 10 across both
+  stages is twenty or more runs. Start small, and use --dry-run first.
 
   Needs the `claude` CLI installed and logged in once: run `claude`, then
   /login. It checks before starting rather than failing partway through.
 
 {_H}stopping and resuming{_H}
-  Ctrl-C is safe. Each iteration is a separate stateless worker, so nothing
+  Ctrl-C is safe. Each iteration is a separate run that starts fresh, so nothing
   is half-written, and re-running continues where you left off because the
   database de-duplicates.
 

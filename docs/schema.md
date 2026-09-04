@@ -51,6 +51,7 @@ later is a mechanical translation.
   sector outside the vocabulary. Add a genuinely new manufacturing sector by editing
   `SECTORS` in `pipeline/schema.py` (Claude Code) or via `sectors-add` /
   `register_sector()` (API), which persists to `sector_registry.json`.
-- **Source exclusion is verify-driven:** the collector is steered away only from projects
-  already in `verify_verified` (the pipeline's authority for "already have it"), not from
-  in-flight Source/Screen leads.
+- **Source exclusion covers both stages:** the collector is steered away from projects
+  already in `verify_verified` (the pipeline's authority for "already have it") *and*
+  from those collected but not yet published, so a run does not re-find what it just
+  found.

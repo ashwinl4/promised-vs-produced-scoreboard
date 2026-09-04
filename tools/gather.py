@@ -154,9 +154,9 @@ def main(argv=None) -> int:
     if args.dry_run:
         print("\n[dry-run] wiring OK. Would now:")
         print(f"  1. collect {n_source} Source lead(s) via llm.collect_source_lead()")
-        print(f"     (steered away from {len(orch.existing_project_names(conn))} "
+        print(f"     (steered away from {len(orch.published_project_names(conn))} "
               f"project(s) in verify_verified + "
-              f"{len(orch.inflight_project_hints(conn))} in-flight Source/Screen lead(s))")
+              f"{len(orch.unpublished_project_names(conn))} collected but unpublished)")
         print(f"  2. extract the first {n_screen} into Screen via llm.extract_screen_row()")
         if do_check and n_screen:
             print(f"  3. run screen_check on the {n_screen} new Screen row(s)")

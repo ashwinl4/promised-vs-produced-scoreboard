@@ -1,7 +1,7 @@
 # Operating prompts for the collection loops
 
-This folder holds the prompts given to the Claude Code workers that grow the
-Scoreboard's data. The loop scripts one directory up start a fresh worker per
+This folder holds the prompts that grow the Scoreboard's data. The loop scripts
+one directory up start a fresh `claude -p` process per
 iteration and hand it exactly one of these files.
 
 ```
@@ -26,20 +26,20 @@ only; nothing here overrides them.
 
 **Contents**
 
-- [How each worker is configured](#how-each-worker-is-configured)
+- [How each process is configured](#how-each-process-is-configured)
 - [Constraints when writing or running these prompts](#constraints-when-writing-or-running-these-prompts)
 
-## How each worker is configured
+## How each process is configured
 
 The loop scripts set all of this. The values below describe what they do, so if
 they ever disagree, the scripts are correct.
 
 | | |
 |---|---|
-| Reference context | `docs/cli.md`, attached to the worker as an `@`-mention |
+| Reference context | `docs/cli.md`, attached to the process as an `@`-mention |
 | Model | `claude-opus-4-8` (`MODEL` env var overrides) |
 | Effort | `high` (`EFFORT` overrides). The CLI has no "extra high"; `high` is the ceiling. |
-| Chat history | none. Every iteration is a fresh, stateless worker. |
+| Chat history | none. Every iteration starts fresh, remembering nothing. |
 | Scope | run only what the given prompt file says |
 
 ## Constraints when writing or running these prompts

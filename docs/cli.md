@@ -8,9 +8,9 @@ things `--help` cannot hold: what needs installing, how the modules fit together
 and a walkthrough on a copy of the database.
 
 > **This file is machine-read.** `collect/source.sh` attaches it to every
-> collection worker with an `@`-mention, and both operating prompts tell the
-> worker it is the command reference. Keep the command list complete: a worker
-> that cannot find a flag here will guess at one.
+> `claude -p` process with an `@`-mention, and both operating prompts point at it
+> as the command reference. Keep the command list complete: a process that cannot
+> find a flag here will guess at one.
 
 Run everything from `aici/scoreboard`. Two invocations, identical in effect:
 
@@ -75,7 +75,7 @@ python3 scoreboard.py export [--out-dir DIR]       # five CSVs
 python3 scoreboard.py coverage --against ref.csv [--stage verify] [--min-capital N]
 python3 scoreboard.py coverage --selftest          # needs no database
 
-# The sector vocabulary  (sectors-add is a HUMAN decision — NEVER run it as a worker)
+# The sector vocabulary  (sectors-add is a HUMAN decision — NEVER run it automatically)
 python3 scoreboard.py sectors-list
 python3 scoreboard.py sectors-add "Cement"
 

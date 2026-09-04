@@ -2,21 +2,42 @@
 
 *Directory: [`../collect/`](../collect/)*
 
-The ongoing collection: shell loops that spawn fresh headless Claude Code workers to
-find new projects and extract them into rows. The short version is in the
+The ongoing collection: shell loops that find new projects and extract them into
+rows, one per iteration. The short version is in the
 [scoreboard README](../README.md#add-data); this is the full set of controls.
 
 *Directory: [`collect/`](../collect/) — `all.sh`, `source.sh`, `screen.sh`, `prompts/`*
 
 Where the bulk import was a one-off load, this is the ongoing collection: shell loops
-that spawn fresh headless Claude Code workers to find new projects and extract
-them. Bookkeeping is below; the full methodology is in
+that find new projects and extract them, one per iteration. Bookkeeping is
+below; the full methodology is in
 [`prompts/README.md`](../collect/prompts/README.md)
 and each `promptN_*.md` beside it.
 
 **Before any run:** `cd` into the `scoreboard/` directory and
 make sure the `claude` CLI is logged in there (`claude` → `/login`, one-time). Each
-command below spawns fresh Claude Code workers via the loop scripts.
+command below starts `claude -p` processes via the loop scripts.
+
+## Words used here
+
+The loop is shell. Each iteration starts one **process** (`claude -p`), which
+searches the web and writes its result back through this same CLI. Nothing
+carries between iterations: a process that has just run knows nothing about the
+one before it, and the only thing they share is the database.
+
+What a row records about its own origin is the **entry path**, in
+`collected_via` — `prompt1`, `prompt2`, `api`, `manual`, and so on. There is no
+column saying "AI" or "human": the [README](../README.md#how-a-project-gets-in)
+and the [methodology](../../paper/docs/v2-scoreboard-methodology.md) describe
+Source and Screen as "AI or human" because either can do them, not because the
+database stores which. Verify is the stage where that distinction is fixed, and
+there it is always human.
+
+One word means something else in this repo: an **assistant** is a chat product
+you paste `source-prompt` into — ChatGPT, Gemini, Perplexity, Claude. That is a
+different path from these loops (see [four ways in](../README.md#add-data)), and
+it needs no key and no `claude` CLI. Do not use "assistant" for the process a
+loop starts, or the two become impossible to tell apart.
 
 ### ⭐ START HERE — PROMPT 1 + PROMPT 2 in one command
 
@@ -56,8 +77,8 @@ Source stage stops the run before Screen — `CONTINUE_ON_FAIL=1` to push on
 anyway, which is what you want when Screen should chew through leads collected
 in an earlier session.
 
-> **Cost:** each stage spawns one fresh headless Claude Code worker per
-> iteration, so `N=10` on both stages is 20+ worker calls. Start small, and use
+> **Cost:** each stage starts one `claude -p` process per
+> iteration, so `N=10` on both stages is 20+ runs. Start small, and use
 > `DRY_RUN=1` first.
 
 Run the stages separately (below) when you want to inspect the Source rows
@@ -84,8 +105,8 @@ ADD=5 bash collect/screen.sh
 
 - `ADD=n` (the collect loops) = add *n* rows this run; `N=n` (`collect.sh`) = how many to add at each stage.
 - Every loop understands `ADD`, `MODEL`, `EFFORT`, `MAX_ITERS`, `MAX_STALL`, `VERBOSE`, `PROMPT_FILE`, `COUNT_TABLE`, `PREFLIGHT`.
-- In `collect.sh` only: `ONLY=source|screen|both`, `DRY_RUN=1`, `CONTINUE_ON_FAIL=1`, and the `SOURCE_` / `SCREEN_` prefixes.
-- `VERBOSE=1` = stream the worker live (JSON firehose); omit for the clean per-iteration heartbeat.
+- In `all.sh` only: `ONLY=source|screen|both`, `DRY_RUN=1`, `CONTINUE_ON_FAIL=1`, and the `SOURCE_` / `SCREEN_` prefixes.
+- `VERBOSE=1` = stream the process live (JSON firehose); omit for the clean per-iteration heartbeat.
 - `Ctrl-C` stops cleanly; re-running continues where you left off (the DB dedups overlap).
 - Provenance: PROMPT 1 stamps `source_collected.collected_via` via `--via prompt1`.
 - Verify is a human-only gate — not driven by these loops.

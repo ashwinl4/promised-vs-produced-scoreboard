@@ -50,9 +50,9 @@ any project already in that list, nor a mere expansion / re-announcement of one.
 If that list says the table is empty, nothing is excluded on this basis and every
 qualifying project is fair game — including the largest and most obvious ones.
 
-A second section, *“Already in flight — collected but not yet verified”*, lists leads
-sitting in Source/Screen (Screen `project` names and Source summaries). **Also avoid
-those** — re-collecting an in-flight lead just produces duplicates.
+A second section, *“Already collected — not yet published; do not collect these again”*, lists projects
+that have been collected but not published yet (Screen `project` names and shortened
+Source summaries). **Also avoid those** — collecting one again just produces a duplicate.
 
 ## Neutrality — this matters
 

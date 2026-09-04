@@ -63,7 +63,7 @@ Rows that clear the schema check land in Screen, ready for review.
 
 An alternative to the `collect` command: collects N Source leads and optionally
 extracts some of them into Screen, in one run, through the Anthropic API rather
-than Claude Code workers.
+than the `claude` CLI.
 
 ```bash
 python3 tools/gather.py --n-source 5 --dry-run        # the plan, no API calls

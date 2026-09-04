@@ -81,34 +81,35 @@ def _operating_prompt(filename: str) -> str:
 
 
 def render_source_prompt(
-    avoid_projects: list[str] | None = None,
-    avoid_inflight: list[str] | None = None,
+    avoid_published: list[str] | None = None,
+    avoid_unpublished: list[str] | None = None,
 ) -> str:
-    """The full Source operating prompt to run in Claude Code (web search).
+    """The full Source instructions for finding one new project.
 
-    Paste the returned text into a web-search-capable assistant; it will find one
-    new qualifying project and end with a single JSON object you can ingest with
-    `source-add --json` (CLI) or the Source "Add from JSON" box (web).
+    Paste the returned text into any assistant that can search the web; it will
+    find one new qualifying project and end with a single JSON object you can
+    ingest with `source-add --json` (CLI) or the Source "Add from JSON" box
+    (web).
 
-    `avoid_projects` is the verify_verified exclusion list; `avoid_inflight` is the
-    already-collected-but-unverified Source/Screen set (see
-    `pipeline.inflight_project_hints`). Both are rendered as distinct sections so
-    the collector steers away from everything already in the pipeline -- not just
-    verify, which stays empty until a human promotes.
+    `avoid_published` is the list of projects already published;
+    `avoid_unpublished` the ones collected but not published yet (see the two
+    functions of those names in `orchestrate`). They are rendered as separate
+    sections so the collector avoids everything already in the pipeline, not
+    just what has reached verify -- which stays empty until a human publishes.
     """
     prompt = _operating_prompt("prompt_source_collected.md")
-    # Always emitted, under the exact title the prompt body points at, so the
-    # Claude Code and direct-API paths both see the live verify_verified state in
-    # the expected place. Emitted even when the table is EMPTY: an absent section
+    # Always emitted, under the exact title the prompt body points at, so every
+    # path that renders this prompt shows the live verify_verified state in the
+    # expected place. Emitted even when the table is EMPTY: an absent section
     # would leave the collector guessing what is already covered, and on a
     # rebuild-from-empty the honest answer is "nothing is".
     prompt += "\n\n## The verify table already holds these — do not collect them\n"
-    if avoid_projects:
+    if avoid_published:
         prompt += (
             "These `project` names are the current contents of the `verify_verified` "
             "table (the authoritative, verified scoreboard). Do **not** collect any of "
             "them, nor a mere expansion / re-announcement of one:\n> "
-            + " · ".join(sorted(set(avoid_projects)))
+            + " · ".join(sorted(set(avoid_published)))
         )
     else:
         prompt += (
@@ -116,18 +117,18 @@ def render_source_prompt(
             "published yet, so no project is excluded on this basis. Collect the best "
             "qualifying project you can find, including the largest and most obvious."
         )
-    if avoid_inflight:
-        # In-flight Source/Screen leads: already collected this run (or a prior
-        # one) but not yet verified into verify. Excluding these is what stops the
-        # collector from re-finding the same top project every iteration while
-        # verify sits empty. Shown as Screen `project` names and Source summaries.
+    if avoid_unpublished:
+        # Collected this run (or an earlier one) but not published. Excluding
+        # these is what stops the collector from re-finding the same top project
+        # every round while verify sits empty. Shown as Screen `project` names
+        # and shortened Source summaries.
         prompt += (
-            "\n\n## Already in flight — collected but not yet verified; do not re-file these\n"
-            "These leads are already sitting in the pipeline's earlier stages "
-            "(Source/Screen), shown as Screen `project` names and one-line Source "
+            "\n\n## Already collected — not yet published; do not collect these again\n"
+            "These projects have been collected already but are still waiting to "
+            "be published, shown as Screen `project` names and shortened Source "
             "summaries. Do **not** collect any project they describe, nor a mere "
             "expansion / re-announcement of one — pick something new:\n> "
-            + " · ".join(sorted(set(avoid_inflight)))
+            + " · ".join(sorted(set(avoid_unpublished)))
         )
     prompt += (
         "\n\n## How to hand the result back\n"
@@ -349,11 +350,11 @@ _SCREEN_SCHEMA = {
 
 
 def collect_source_lead(
-    avoid_projects: list[str] | None = None,
-    avoid_inflight: list[str] | None = None,
+    avoid_published: list[str] | None = None,
+    avoid_unpublished: list[str] | None = None,
 ) -> dict:
     """[API flavour] Find ONE new qualifying project and return its lead dict."""
-    research = _research(render_source_prompt(avoid_projects, avoid_inflight))
+    research = _research(render_source_prompt(avoid_published, avoid_unpublished))
     if _looks_like_no_result(research):
         raise LLMUnavailable(
             "the model reported it could not find a qualifying new project"

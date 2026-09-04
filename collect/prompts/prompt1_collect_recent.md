@@ -69,7 +69,7 @@ preference for size.
    python -m pipeline.cli source-prompt
    ```
    That renders `prompt_source_collected.md` **plus the live "do not collect these"
-   lists** (verify + in-flight Source/Screen — including every lead you added earlier
+   lists** (published + already collected — including every lead you added earlier
    in this same call). It defines what qualifies: U.S. single facility; announced
    capital ≥ $100M **OR** ≥ 200 direct jobs; announced Jan 2017–today; one of the
    defined manufacturing sectors. Follow it; do not restate or weaken it.
