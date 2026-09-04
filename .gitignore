@@ -20,3 +20,5 @@
 # is the one exception.
 *.db
 !outputs/scoreboard.db
+!outputs/scoreboard_empty.db
+!outputs/scoreboard_combined.db
