@@ -1,1 +1,4 @@
 id,datetime,screen_extracted_id,result_status,n_errors,n_warnings,report
+1,2026-09-04T19:11:21Z,1,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: status_source (Axios) returned HTTP 403 and could not be scraped; current-status""}]"
+2,2026-09-04T19:13:45Z,2,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Promised first output slipped from 2025 (original announcement) to ~2028 (status""}]"
+3,2026-09-04T19:15:05Z,3,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: actual_first_output unconfirmed: status source confirms Sinton is in full operat""}]"
