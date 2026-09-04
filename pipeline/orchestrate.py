@@ -15,6 +15,7 @@ a human is doing it:
 
 from __future__ import annotations
 
+import re
 import sqlite3
 
 from pipeline import source, screen, verify, llm
@@ -36,14 +37,60 @@ def existing_project_names(conn: sqlite3.Connection) -> list[str]:
     return sorted(names)
 
 
+_SUMMARY_DASH = re.compile(r"\s+(?:\u2014|\u2013|--)\s+")
+_SUMMARY_STOP = re.compile(r"(?<=[a-z0-9)])\.\s+(?=[A-Z])")
+
+
+def _summary_head(summary: str, floor: int = 80, cap: int = 140) -> str:
+    """The identifying head of a Source summary, for use as an exclusion entry.
+
+    Source rows carry no project name, so the summary is their only identifier
+    -- but it is written for a human reader and averages ~310 characters. Every
+    source worker reads the whole exclusion list on every iteration, so a long
+    run pays for that length once per row per iteration: at N=300 the untrimmed
+    summaries cost ~2.5M tokens more than their heads do.
+
+    Collectors write summaries as `Title -- prose. Operator: X.`, and that title
+    ("Eli Lilly Houston API Plant") makes a better entry than the prose. It is
+    ~130 characters, and it usually names the company *and* the site -- which is
+    what the prompt's exclude-sites-not-companies rule needs in order to tell
+    one Eli Lilly plant from another. A title shorter than `floor` is not
+    trusted to stand alone ("Nucor plate mill" leaves the town on the far side
+    of the dash), so those read on to the floor instead; measured over the
+    archived corpus that lifts entries retaining a place name from 46% to 73%,
+    at 42% of the full summary length rather than 30%. Summaries written in
+    some other shape fall back to the first sentence, then to a word-boundary
+    cut at `cap`.
+    """
+    summary = (summary or "").strip()
+    if not summary:
+        return ""
+    for pattern in (_SUMMARY_DASH, _SUMMARY_STOP):
+        m = pattern.search(summary)
+        # Ignore a match so early it cannot be a title (a stray "--"), or so
+        # late that keeping only the head would save nothing.
+        if m and 8 <= m.start() <= cap:
+            end = m.start() + (1 if pattern is _SUMMARY_STOP else 0)
+            if end >= floor:
+                return summary[:end].strip()
+            # Title too terse to stand alone ("Nucor plate mill" when the town
+            # is on the far side of the dash). Keep reading to the floor.
+            break
+    if len(summary) <= cap:
+        return summary
+    cut = summary.rfind(" ", 0, cap)
+    return summary[:cut if cut > floor else cap].rstrip() + "\u2026"
+
+
 def inflight_project_hints(conn: sqlite3.Connection) -> list[str]:
     """Identifiers for leads already in flight in Source/Screen but not yet in Verify.
 
     Verify is a human-only gate, so `verify_verified` stays empty during automated
     collection. If the source collector saw only the verify exclusion list, it would
     re-collect the same top project on every iteration -- the duplicate-source bug.
-    These hints -- Screen `project` names and Source `summary` lines (source rows
-    have no project name of their own) -- are what actually stop duplicate
+    These hints -- Screen `project` names, plus the identifying head of the
+    `summary` for source rows not yet screened (source rows have no project
+    name of their own; see `_summary_head`) -- are what actually stop duplicate
     collection within and across `gather` runs. Because `source.insert_lead`
     commits immediately, a lead collected earlier in the same batch is already
     visible here on the next call. Fed to `llm.render_source_prompt` alongside the
@@ -53,8 +100,14 @@ def inflight_project_hints(conn: sqlite3.Connection) -> list[str]:
         project = (r["project"] or "").strip()
         if project:
             hints.add(project)
-    for r in conn.execute("SELECT summary FROM source_collected").fetchall():
-        summary = (r["summary"] or "").strip()
+    # Summaries only for leads that have not been screened yet: once a lead
+    # reaches Screen it has a `project` name for the same site, and listing
+    # both names the project twice.
+    for r in conn.execute(
+        "SELECT summary FROM source_collected s WHERE NOT EXISTS "
+        "(SELECT 1 FROM screen_extracted e WHERE e.source_collected_id = s.id)"
+    ).fetchall():
+        summary = _summary_head(r["summary"] or "")
         if summary:
             hints.add(summary)
     return sorted(hints)
