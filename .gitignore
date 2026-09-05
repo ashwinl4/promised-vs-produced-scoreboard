@@ -1,12 +1,35 @@
-# Scoreboard-local ignores.
+# The Scoreboard's ignores. This is the only .gitignore in the repository.
 #
-# Repo-wide rules live in the root .gitignore and already cover .DS_Store,
-# .venv/, __pycache__/, *.pyc and .env. Do not repeat them here; this file is
-# only for what is specific to the Scoreboard.
+# It used to say these rules lived in a root .gitignore one directory up and
+# must not be repeated here. That was true while this was aici/scoreboard/
+# inside the monorepo. The split left the sentence behind and the rules with
+# the old repository, so for a while the only thing ignoring .env and .DS_Store
+# here was a personal ~/.gitignore_global -- invisible from inside the project,
+# and absent on everyone else's machine. An untracked .env holding an API key
+# would have shown up as a file waiting to be added.
 #
-# The data product IS committed. outputs/scoreboard.db and the three CSV
-# exports beside it are what someone clones this directory for, so nothing
-# below may exclude them.
+# The data product IS committed. outputs/scoreboard.db and the CSV exports
+# beside it are what someone clones this repository for, so nothing below may
+# exclude them.
+
+# --- Recovered from the monorepo root on the split ------------------------- #
+# Local environments and build artefacts. Not anchored to one directory: the
+# README documents `python -m venv .venv` and it can be made anywhere.
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Credentials. .env is the reason this block is not optional.
+.env
+config.env
+!.env.example
+
+# macOS Finder droppings. Finder writes one into any directory it displays, so
+# they appear without anyone touching the project. git-filter-repo also counts
+# ignored files when deciding whether a clone is fresh, so a stray one can stop
+# a future split until it is removed.
+.DS_Store
 
 # SQLite writes these beside the database while a transaction is open and
 # removes them on commit. They are never part of the data, and a stray one left
