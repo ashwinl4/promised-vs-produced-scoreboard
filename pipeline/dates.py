@@ -48,16 +48,28 @@ from datetime import date
 TO_BE_COMPLETED = -1.0
 CANCELLED = -2.0
 NO_PROMISE = -3.0
+PRODUCED_UNDATED = -4.0
 
 # Map the float sentinel back to its standardized label (schema-level vocabulary).
 SENTINEL_LABELS = {
     TO_BE_COMPLETED: "to be completed",
     CANCELLED: "cancelled",
     NO_PROMISE: "no promise recorded",
+    PRODUCED_UNDATED: "produced, date unknown",
 }
 
 _CANCELLED_TOKENS = ("never", "cancel")  # 'cancel' also matches cancelled/canceled
-_PENDING_TOKENS = ("pending", "tbd", "unconfirmed", "n/a", "open", "unknown")
+_PENDING_TOKENS = ("pending", "tbd", "n/a", "open", "unknown")
+
+# 'unconfirmed' is NOT pending. It means the sources say the plant has produced
+# or is operating but give no date for first output -- an EVENT whose date is
+# missing, not a project still waiting to produce. The collector had been using
+# the two words that way consistently (26 of 27 'pending' rows say "not yet
+# producing"; all 6 'unconfirmed' rows say the opposite) while the parser
+# collapsed both to TO_BE_COMPLETED, which is the right-censoring flag. Five of
+# fifty-three rows were therefore recorded as never having produced while their
+# own current_status read "IN FULL OPERATION" or "PRODUCING".
+_UNDATED_EVENT_TOKENS = ("unconfirmed",)
 
 _YEAR_RE = re.compile(r"(?:19|20)\d{2}")
 _YMD_RE = re.compile(r"((?:19|20)\d{2})-(\d{1,2})(?:-(\d{1,2}))?")
@@ -74,6 +86,7 @@ def interpret_date(raw) -> tuple[str | None, str]:
       * ``"date"``            -- ``iso_date`` is ``"YYYY-MM-DD"``
       * ``"cancelled"``       -- promise cancelled / never delivered (no date)
       * ``"to_be_completed"`` -- no concrete date yet (pending/open/tbd/...)
+      * ``"produced_undated"`` -- it HAS produced, but no source gives a date
       * ``"empty"``           -- blank / unparseable
 
     Ranges are collapsed to their healthy middle (see the module docstring).
@@ -84,6 +97,8 @@ def interpret_date(raw) -> tuple[str | None, str]:
     low = s.lower()
     if any(t in low for t in _CANCELLED_TOKENS):
         return None, "cancelled"
+    if any(t in low for t in _UNDATED_EVENT_TOKENS):
+        return None, "produced_undated"
     if any(t in low for t in _PENDING_TOKENS):
         return None, "to_be_completed"
 
@@ -136,8 +151,10 @@ def compute_lag_slip(announced, promised, actual):
     * ``slip_years`` = promised  -> actual   (signed; **negative == early**).
 
     If ``actual`` has no concrete date the pair is a sentinel: ``CANCELLED``
-    (-2.0) when the promise was cancelled/never delivered, else ``TO_BE_COMPLETED``
-    (-1.0).
+    (-2.0) when the promise was cancelled/never delivered, ``PRODUCED_UNDATED``
+    (-4.0) when it HAS produced but no source dates it, else ``TO_BE_COMPLETED``
+    (-1.0). -1.0 and -4.0 are both "no number", and the difference between them
+    decides whether a row is censored -- only -1.0 belongs in the censored set.
 
     When ``promised`` has no date, ``slip`` is ``NO_PROMISE`` (-3.0) and NOT
     ``TO_BE_COMPLETED``. Those are different facts and collapsing them corrupts
@@ -155,6 +172,11 @@ def compute_lag_slip(announced, promised, actual):
 
     if x_kind == "cancelled":
         return a_iso, p_iso, x_iso, CANCELLED, CANCELLED
+    if x_kind == "produced_undated":
+        # An event with a missing date, not a censored observation. Neither span
+        # can be computed, but it must not sit in the censored set: a survival
+        # model would treat a mill in full operation as still waiting.
+        return a_iso, p_iso, x_iso, PRODUCED_UNDATED, PRODUCED_UNDATED
     if x_iso is None:  # pending / tbd / empty -> not produced yet
         return a_iso, p_iso, x_iso, TO_BE_COMPLETED, TO_BE_COMPLETED
 

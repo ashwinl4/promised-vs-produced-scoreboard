@@ -114,8 +114,15 @@ Each stage is a small module the two interfaces share:
   **`*_raw` → token → `*_dt`** chain: the extractor supplies the verbatim source
   text (`*_raw`) and a clean normalized token; this module resolves the token to
   a `*_dt` DATETIME (a fuzzy range becomes its healthy middle) and computes the
-  float `lag_years` and `slip_years`, with `-1` "to be completed" and `-2`
-  "cancelled" sentinels.
+  float `lag_years` and `slip_years`, with four sentinels in place of a number:
+  `-1` "to be completed" (not produced yet — the censored case), `-2`
+  "cancelled", `-3` "no promise recorded" (slip only: it produced, but no
+  source states what was promised), and `-4` "produced, date unknown" (the
+  sources say it is producing but none dates first output).
+
+  `-1` and `-4` both mean "no number", and the difference decides whether a row
+  is right-censored. Only `-1` is. A survival analysis filtering on `< 0` will
+  treat a mill in full operation as still waiting.
 - `llm.py` — the AI steps in two flavours: rendered prompts (no key) and the
   direct API. The prompt builders never import the Anthropic SDK.
 

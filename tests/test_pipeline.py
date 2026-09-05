@@ -96,6 +96,20 @@ class TestLagAndSlip(Base):
         self.assertLess(slip, 0)
         self.assertNotIn(slip, (dates.TO_BE_COMPLETED, dates.CANCELLED, dates.NO_PROMISE))
 
+    def test_produced_but_undated_is_not_censored(self):
+        """'unconfirmed' means the sources say it produced and give no date --
+        an event with a missing date. Five of fifty-three rows were sitting in
+        the censored set with a current_status reading "IN FULL OPERATION"."""
+        *_, lag, slip = dates.compute_lag_slip("2019-07", "2021", "unconfirmed")
+        self.assertEqual(lag, dates.PRODUCED_UNDATED)
+        self.assertEqual(slip, dates.PRODUCED_UNDATED)
+        self.assertNotEqual(lag, dates.TO_BE_COMPLETED)
+
+    def test_pending_is_still_censored(self):
+        """The other half of the split: 'pending' must keep meaning censored."""
+        *_, lag, _ = dates.compute_lag_slip("2019-07", "2021", "pending")
+        self.assertEqual(lag, dates.TO_BE_COMPLETED)
+
     def test_lag_ignores_the_promise(self):
         """Gestation is announced -> actual. Re-promising must not move it."""
         _, _, _, lag_a, _ = dates.compute_lag_slip("2021-09", "2025", "2026-03")

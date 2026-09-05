@@ -287,6 +287,8 @@ def parse_lag(value: str) -> tuple[float | None, bool, str | None]:
         return None, False, None
     if v in ("-3", "-3.0"):   # "no promise recorded" -- nothing to measure against
         return None, False, None
+    if v in ("-4", "-4.0"):   # "produced, date unknown" -- an event, not censored
+        return None, False, None
     is_open = ("+" in v) or ("open" in v.lower())
     num = "".join(ch for ch in v if ch.isdigit() or ch == ".")
     if num.count(".") > 1 or num == "":
