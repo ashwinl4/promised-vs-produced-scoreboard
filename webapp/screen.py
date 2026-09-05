@@ -264,6 +264,44 @@ INSPECT_COLUMNS = [
     if c not in verify.DERIVED_FIELDS and c != "verification_tier"
 ]
 
+# What each cell means, shown beside its label.
+#
+# The two date cells are the ones that need it. A reviewer reading a status
+# source that says "output now slated for 2028" reasonably wants to type 2028
+# somewhere, and the only date-shaped box on the form is actual_first_output --
+# which would record a plant as having produced when it has not. The revised
+# date has no cell of its own (the schema carries one promise and one actual),
+# so it belongs in current_status, and the form has to say so rather than leave
+# the reviewer to work it out. It cost real time twice on the same day: once on
+# a TSMC row, once on a Ford one.
+FIELD_HINTS = {
+    "announced": "when it was announced. YYYY-MM.",
+    "promised_first_output": (
+        "the <b>original</b> promise, as first announced — slip is measured "
+        "against it. Do <b>not</b> update it when the date moves; that belongs "
+        "in current_status. A year alone is fine (2025, 2025-Q4, "
+        "“2025 (second half)”)."
+    ),
+    "actual_first_output": (
+        "only when it has <b>actually produced</b>. Not yet producing → "
+        "<code>pending</code>. A promise revised to a later date is still "
+        "<code>pending</code> — put the new date in current_status. "
+        "<code>never</code> if cancelled, <code>unconfirmed</code> if it has "
+        "produced but no source gives a date."
+    ),
+    "current_status": (
+        "where it really stands today, in the sources' own terms — and where a "
+        "revised output date goes."
+    ),
+    "promised_capital_usd": "digits only, no $ or commas.",
+    "promised_jobs": "digits only.",
+    "flag": "anything unresolved. Leave empty if the extraction is clean.",
+    "promised_date_source": (
+        "only if the promised date came from a different document than "
+        "promise_source. Leave empty otherwise."
+    ),
+}
+
 
 @router.get("/screen/{screen_id}/inspect", response_class=HTMLResponse)
 def screen_inspect(screen_id: int, msg: Optional[str] = None):
@@ -280,6 +318,8 @@ def screen_inspect(screen_id: int, msg: Optional[str] = None):
     promotable = verdict in ("PASS", "CLEAN")
 
     def _field(c: str) -> str:
+        hint = FIELD_HINTS.get(c, "")
+        hint_html = f' <small>{hint}</small>' if hint else ""
         if c == "sector":
             # Manual sector entry is a dropdown of the live vocabulary (+ the
             # row's current value) -- identical to the Verify edit form.
@@ -293,7 +333,7 @@ def screen_inspect(screen_id: int, msg: Optional[str] = None):
             )
             return (f"""<div><label>sector</label>
         <select name="sector">{options}</select></div>""")
-        return (f"""<div><label>{esc(c)}</label>
+        return (f"""<div><label>{esc(c)}{hint_html}</label>
         <input type="text" name="{esc(c)}" value="{esc(r[c])}"></div>""")
 
     fields = "".join(_field(c) for c in INSPECT_COLUMNS)

@@ -428,6 +428,23 @@ def cmd_review(conn, args):
             ]
             for label, value in facts:
                 print(f"    {label:18} {value}")
+
+            # A status source that says "output now slated for 2028" invites the
+            # reader to treat 2028 as the answer to one of these two lines. It is
+            # neither: promised output is the ORIGINAL promise, because that is
+            # what slip measures against, and actual output means it has really
+            # produced. A revised date has no cell of its own and lives in
+            # current_status. Say so where the two dates are on screen, rather
+            # than leaving it to be worked out -- it cost real time twice in one
+            # day, on a TSMC row and a Ford one.
+            status = (row["current_status"] or "").strip()
+            if status:
+                print()
+                print(f"    status now         {status[:150]}")
+            print()
+            print("    (promised output = the original promise, not a revised one;")
+            print("     actual output = it really produced. A slipped date stays in")
+            print("     'status now' and leaves both of those alone.)")
             print()
             print(f"    promise source  {cyan(row['promise_source'] or '(none)')}")
             print(f"    status source   {cyan(row['status_source'] or '(none)')}")
