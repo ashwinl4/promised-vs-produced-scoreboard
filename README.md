@@ -333,8 +333,12 @@ Longer reference, kept out of this file:
   the real exports. `SCOREBOARD_NO_AUTOEXPORT=1` turns it off, and any command
   will then warn you that the CSVs have fallen behind.
 - The database is `outputs/scoreboard.db`. Override it with `SCOREBOARD_DB=/path/to/other.db`
-  or `--db` on any command. Most commands open it read-write, so copy the file
-  first if you want to experiment.
+  or `--db` on any command. Most commands open it read-write.
+- `SCOREBOARD_READONLY=1` opens it read-only for that command: everything that reads
+  still works, everything that writes refuses and says which flag to unset. Use it
+  when you are checking on the corpus rather than changing it — poking at a research
+  dataset to confirm something is fine should not be able to alter it. Cheaper and
+  more certain than copying the file first.
 - Keep the database on a local disk. SQLite locking is unreliable over network
   and virtual-machine file shares, which shows up as `database is locked`.
 - Only the web interface needs installed dependencies

@@ -199,6 +199,56 @@ def _autoexport(target: Path) -> None:
               "Run `python3 scoreboard.py export` before committing.", file=sys.stderr)
 
 
+# Set once at import: a process is read-only for its whole life, or it is not.
+# Reading it per-call would let a long-running process change mode halfway
+# through, which is exactly the ambiguity this is meant to remove.
+READ_ONLY = os.getenv("SCOREBOARD_READONLY", "").strip() not in ("", "0", "false", "no")
+
+
+class _ReadOnlyConnection(sqlite3.Connection):
+    """A connection that says why it will not write, rather than what failed.
+
+    SQLite's own refusal is `sqlite3.OperationalError: attempt to write a
+    readonly database`, which reads like a permissions bug on the file. The
+    cause is almost always that SCOREBOARD_READONLY is still exported from an
+    earlier command, so say that instead.
+    """
+
+    # All three, not just execute(). SQLite blocks the write either way -- the
+    # file handle is read-only, so safety never depended on this class -- but
+    # executescript() and executemany() would otherwise surface the raw
+    # "attempt to write a readonly database", which reads like a file
+    # permissions problem rather than a flag the caller forgot to unset.
+    @staticmethod
+    def _explain(exc):
+        if "readonly database" not in str(exc):
+            raise exc
+        raise SystemExit(
+            "This command writes, and $SCOREBOARD_READONLY is set, so the "
+            "database was opened read-only.\n"
+            "    unset SCOREBOARD_READONLY\n"
+            "and run it again."
+        ) from None
+
+    def execute(self, sql, *args):
+        try:
+            return super().execute(sql, *args)
+        except sqlite3.OperationalError as exc:
+            self._explain(exc)
+
+    def executemany(self, sql, *args):
+        try:
+            return super().executemany(sql, *args)
+        except sqlite3.OperationalError as exc:
+            self._explain(exc)
+
+    def executescript(self, sql):
+        try:
+            return super().executescript(sql)
+        except sqlite3.OperationalError as exc:
+            self._explain(exc)
+
+
 class _SyncingConnection(sqlite3.Connection):
     """A connection that keeps the CSV exports in step with the database.
 
@@ -236,7 +286,27 @@ def connect(path: str | Path | None = None) -> sqlite3.Connection:
     rest of the code can query `source_collected` / `verify_verified` without
     knowing (and without the original file ever being modified)."""
     target = Path(path) if path is not None else db_path()
-    if schema_flavour(target) == "legacy":
+    if READ_ONLY:
+        # $SCOREBOARD_READONLY=1 -- every command in this process can read and
+        # none can write. It exists because checking something is not supposed
+        # to change it, and repeatedly did: a `screen-check --all` run to prove
+        # the CLI still worked wrote 23 rows into the corpus, and an `export`
+        # from a scratch database overwrote the real CSVs. Both were verification
+        # steps. SQLite enforces this at the file handle, so it holds for any
+        # code path, including ones that forget to ask.
+        try:
+            conn = sqlite3.connect(f"file:{target}?mode=ro", uri=True,
+                                   factory=_ReadOnlyConnection)
+        except sqlite3.OperationalError:
+            # mode=ro cannot create a file, so a missing database fails here
+            # rather than at the first write. Say which of the two it is.
+            raise SystemExit(
+                f"No database at {target}, and $SCOREBOARD_READONLY is set, so "
+                "one cannot be created.\n"
+                "    unset SCOREBOARD_READONLY\n"
+                "and run it again."
+            ) from None
+    elif schema_flavour(target) == "legacy":
         # Read-only, so it can never dirty anything and never needs mirroring.
         conn = sqlite3.connect(f"file:{_legacy_view(target)}?mode=ro", uri=True)
     else:
