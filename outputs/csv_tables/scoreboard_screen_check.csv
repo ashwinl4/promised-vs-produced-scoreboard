@@ -22,3 +22,33 @@ id,datetime,screen_extracted_id,result_status,n_errors,n_warnings,report
 21,2026-09-04T20:40:28Z,21,CLEAN,0,0,[]
 22,2026-09-04T20:41:43Z,22,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: promised_date_source (governor.ohio.gov) returned HTTP 404 and could not be read""}]"
 23,2026-09-04T20:44:38Z,23,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Status source states start of production Nov 12, 2025 but does not mention the l""}]"
+24,2026-09-05T09:27:12Z,24,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: promise_source (investor.lilly.com) 403s/times out to WebFetch; read via web.arc""}]"
+25,2026-09-05T09:28:19Z,25,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Announcement source states no promised first-output date (only intent to break g""}]"
+26,2026-09-05T09:30:01Z,26,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: status_source (businesswire) 403s to WebFetch and browser-UA curl; read via http""}]"
+27,2026-09-05T09:30:46Z,27,CLEAN,0,0,[]
+28,2026-09-05T09:31:47Z,28,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Jobs figure differs by source: IEDC announcement says 'up to 800 new, high-wage ""}]"
+30,2026-09-05T09:33:52Z,30,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: The ExxonMobil promise_source states only a 'multibillion dollar investment' wit""}]"
+31,2026-09-05T09:34:51Z,31,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Other used; candidate new sector: Electronics/Displays (flat-panel LCD display m""}]"
+32,2026-09-05T09:36:13Z,32,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: status_source 403'd to WebFetch; read via curl browser UA over HTTP/1.1 (ladder ""}]"
+33,2026-09-05T09:37:17Z,33,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Capital figure discrepancy: promise_source states $1.12B initial ($954M + $166M ""}]"
+34,2026-09-05T09:38:36Z,34,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Capital discrepancy: original announcement gave Phase One ~$1.3B and 'multi-bill""}]"
+35,2026-09-05T09:40:50Z,35,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Lead summary dates the announcement April 23, 2024; the given promise_source (ki""}]"
+36,2026-09-05T09:41:49Z,36,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Neither source states a promised production/first-output date, so promised_first""}]"
+37,2026-09-05T09:42:58Z,37,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Mill is confirmed producing/ramping in the Oct 2025 status source, but neither p""}]"
+38,2026-09-05T09:43:55Z,38,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: No promised production/operational date stated in either source; the lead summar""}]"
+39,2026-09-05T09:45:33Z,39,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: status_source 403s to WebFetch and browser-UA curl; read via http://web.archive.""}]"
+40,2026-09-05T09:46:57Z,40,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: promise_source returned HTTP 402 (paywall) to WebFetch and a redirect loop to cu""}]"
+41,2026-09-05T09:48:13Z,41,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: The $15B announcement gives no specific first-output date (only 'through the end""}]"
+42,2026-09-05T09:49:37Z,42,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: status_source (FoodDive, dated 2021-04-12) frames the opening as imminent ('oper""}]"
+43,2026-09-05T09:50:49Z,43,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Other used; candidate new sector: Home Appliances. actual_first_output unconfirm""}]"
+44,2026-09-05T09:52:17Z,44,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: status_source original 403s then 404s to WebFetch/curl; read via https://web.arc""}]"
+45,2026-09-05T09:54:46Z,45,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: promise_source rtx.com renders its article via JavaScript only (no readable body""}]"
+46,2026-09-05T09:56:56Z,46,CLEAN,0,0,[]
+47,2026-09-05T09:58:34Z,47,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: promise_source (businesswire) returned HTTP 403 to WebFetch and browser-UA curl;""}]"
+48,2026-09-05T09:59:59Z,48,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: promised_date_source (businesswire) 403s to WebFetch and to curl with browser UA""}]"
+49,2026-09-05T10:01:25Z,49,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: status_source 403 to WebFetch; read via curl with browser UA (step 2). promised_""}]"
+50,2026-09-05T10:02:32Z,50,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Capital discrepancy: UCB press release states ~$5B total economic impact (not a ""}]"
+51,2026-09-05T10:04:02Z,51,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: actual_first_output date not stated in sources: status source (CBT News, Apr 22,""}]"
+53,2026-09-05T10:06:42Z,53,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: No promised direct-jobs figure is stated in any of the three cited sources (reco""}]"
+54,2026-09-05T10:07:30Z,54,CLEAN,0,0,[]
+55,2026-09-05T10:08:17Z,55,CLEAN,0,0,[]
