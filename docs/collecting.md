@@ -94,13 +94,9 @@ ADD=25 bash collect/source.sh
 `ADD` = screen rows to add. `screen.sh` is the *same* loop as `source.sh`, pointed at the
 extraction prompt and counting a different table, so this is a thin wrapper.
 
-Each call extracts **up to three** leads, the way PROMPT 1 collects up to five. The
-fixed cost of a call — reading `docs/cli.md`, orienting, checking where the database
-stands — is the same whether it produces one row or three, and doing one row per call
-paid it every time: the first N=20 run spent about 13 turns per Screen row against
-Source's 6.6. Because the loop stops once `ADD` rows exist, a batch can overshoot the
-target by a row or two; that is extra data, not a fault, and PROMPT 1 has always
-behaved the same way.
+Each call extracts **one** lead. Batching three per call was measured and reverted —
+see the note in `collect/prompts/prompt2_extract_screen.md`. Use
+`source-list --unscreened --brief` to see what Screen still has to do.
 
 ```bash
 ADD=5 bash collect/screen.sh

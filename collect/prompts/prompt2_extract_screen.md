@@ -1,4 +1,4 @@
-# PROMPT 2 — Extract up to 3 Screen rows from Source leads (standardized input)
+# PROMPT 2 — Extract one Screen row from a Source lead (standardized input)
 
 You are running as a single Claude Code call. You have been shown
 `docs/cli.md`, the pipeline's command reference. Do **only** what this prompt says.
@@ -13,25 +13,18 @@ the sources actually state, never from in-model knowledge.
 existing `screen-add` and `screen-check` commands. Do not invent scripts, and do not
 compute lag/slip or the `*_dt` dates yourself (the pipeline derives those).
 
-## How many to extract this call: up to 3, one at a time
+## How many to extract this call: exactly one
 
-Extract **up to three** leads in this call. Three is a **ceiling, not a quota**:
-if only one lead is left, do that one and stop. Never lower the standard of an
-extraction to reach the number — a thin row costs more to fix later than it saves
-now.
+Extract **one** lead in this call, then stop. Do not start a second one, even if
+more leads are waiting and you have room — the loop that launched you will start
+a fresh call for the next.
 
-Do them **one at a time**: a full cycle per lead — render its prompt, read its
-sources, `screen-add`, `screen-check` — and only then start the next. Do **not**
-read three leads' sources first and write three rows at the end. Each row must be
-committed before the next begins, so an interruption leaves finished rows behind
-rather than a half-read batch.
-
-**Why three and not one.** Every call pays a fixed start-up cost — reading
-`docs/cli.md`, orienting, checking where the database stands — and that cost is
-the same whether it produces one row or three. Screening one row per call spent
-about 13 turns per row against the Source stage's 6.6, almost entirely because
-Source amortises that start-up over five projects and Screen was paying it every
-time.
+**This was measured, not assumed.** Batching three leads per call was tried and
+reverted: it saved 5% of turns (noise) while costing 15% more tokens, because a
+call holding three leads' pages re-reads all of them on every turn. It also
+recorded an unsupported date on the one lead in the test whose sources did not
+support the claim. One lead per call keeps each extraction reading only its own
+sources.
 
 ## The standardized input is the pipeline's own rendered prompt
 
@@ -91,8 +84,7 @@ you name the candidate in `flag` — never a sector name you coined, never an ed
 
    No smoke testing beyond running the check.
 
-Then go back to the work-queue listing and start the next lead. **Stop as soon as**
-there are no unscreened leads left, or you have extracted three.
+That is the whole call. **Stop** — do not pick up another lead.
 
 Everything at this stage is provisional (`verification_tier = P`). Verify promotion is
 a separate **human** gate and is **not** part of this prompt.

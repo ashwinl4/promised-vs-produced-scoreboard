@@ -12,7 +12,7 @@ iteration and hand it exactly one of these files.
   search, skipping everything already collected. The status ("produced") source
   must be the most recent one available as of today. Driven by
   `source.sh`.
-- `prompt2_extract_screen.md` — extract up to three Source leads into Screen rows using
+- `prompt2_extract_screen.md` — extract one Source lead into a Screen row using
   the pipeline's own rendered Screen prompt, then run the deterministic check.
   Driven by `screen.sh`. It extracts any Source lead,
   whatever put the lead there.
