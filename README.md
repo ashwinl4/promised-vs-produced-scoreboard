@@ -197,6 +197,32 @@ python3 scoreboard.py collect --n 5 --dry-run
 Each stage starts one process per iteration, so `--n 10` across both stages is 20
 or more runs. Start small.
 
+**Leaving a long run unattended.** A run of any size takes minutes per row, so
+anything past `--n 20` is an hour or more. The risk is not the pipeline — Ctrl-C
+is safe and a re-run resumes — it is the machine going to sleep underneath it and
+stopping the loop mid-iteration.
+
+On macOS, `caffeinate -i` holds off idle sleep for exactly as long as the command
+it wraps, then releases, so there is no setting to remember to undo:
+
+```bash
+caffeinate -i python3 scoreboard.py collect --n 30
+```
+
+It does **not** survive closing the lid, which sleeps the machine by another
+route: leave the lid open, and preferably on power. On Linux, `systemd-inhibit`
+is the equivalent; on Windows, `powercfg` settings. Neither is needed if the
+machine is already set never to sleep.
+
+Two knobs worth setting on a long run. `MAX_STALL` (default 3) ends a stage after
+that many iterations add no rows — reasonable at small sizes, but a large run
+searches harder for projects it does not already hold, so stalling becomes normal
+rather than a fault; raising it to 6 stops a run ending early. And `VERBOSE=1`
+writes every event to `logs/<run>.raw.jsonl`, which is what you will want if
+something goes wrong while you were asleep. It goes to its own file rather than
+into the transcript, so the readable log stays readable — the three files a run
+writes are described under **What a run costs** below.
+
 ### Four ways in, and only two of them need Anthropic
 
 Collection is the only part of the Scoreboard that touches a model at all. The
