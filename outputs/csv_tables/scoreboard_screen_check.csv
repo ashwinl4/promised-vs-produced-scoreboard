@@ -16,7 +16,6 @@ id,datetime,screen_extracted_id,result_status,n_errors,n_warnings,report
 15,2026-09-04T20:33:02Z,15,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: promise_source (WSAZ) is a video page whose article body did not render, so the ""}]"
 16,2026-09-04T20:34:26Z,16,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Promised first-output date is fuzzy ('production output will ramp in the latter ""}]"
 17,2026-09-04T20:35:54Z,17,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: The lead summary says first output was originally targeted for 2024, but none of""}]"
-18,2026-09-04T20:37:31Z,18,FAIL,1,1,"[{""column"": ""promised_date_source"", ""level"": ""ERROR"", ""message"": ""provenance value 'None' does not look like a URL""}, {""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Neither source states a promised first-output date (promise release gives no ope""}]"
 19,2026-09-04T20:37:45Z,19,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Neither source states a promised first-output date (promise release gives no ope""}]"
 20,2026-09-04T20:39:07Z,20,PASS,0,1,"[{""column"": ""flag"", ""level"": ""WARN"", ""message"": ""unresolved flag: Promised-date discrepancy: original announcement said operations begin 2026, but""}]"
 21,2026-09-04T20:40:28Z,21,CLEAN,0,0,[]
