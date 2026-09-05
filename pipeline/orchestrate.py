@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from datetime import date
 
 from pipeline import source, screen, verify, llm
 
@@ -115,6 +116,38 @@ def unpublished_project_names(conn: sqlite3.Connection) -> list[str]:
     return sorted(names)
 
 
+def announced_year_coverage(conn: sqlite3.Connection,
+                           first_year: int = 2017) -> dict[int, int]:
+    """{announcement year: rows collected}, across the eligible window.
+
+    Every Source lead that has reached Screen has a parsed `announced_dt`, so
+    this counts what the corpus actually covers rather than what it meant to.
+
+    It exists because the first N=20 batch came back 70% announced in 2021-2022
+    and empty in three years of the window. Nobody chose that: the prompt says
+    to vary the search axis, but the most heavily reported projects cluster in
+    the CHIPS/IRA period, so an open-ended search returns them and the exclusion
+    list only removes the exact sites already taken -- never the vintage.
+
+    Note what this does and does not claim. Some of that concentration is real;
+    there genuinely were more announcements in 2021-2022. The problem is that
+    the corpus cannot tell you which part is the world and which is the search,
+    and a reader will ask. Showing the collector its own coverage makes the
+    year distribution a decision rather than a residue.
+    """
+    counts = {y: 0 for y in range(first_year, date.today().year + 1)}
+    for row in conn.execute(
+        "SELECT announced_dt FROM screen_extracted WHERE announced_dt IS NOT NULL"
+    ):
+        try:
+            year = int(str(row["announced_dt"])[:4])
+        except (TypeError, ValueError):
+            continue
+        if year in counts:
+            counts[year] += 1
+    return counts
+
+
 def filter_by_thresholds(
     conn: sqlite3.Connection,
     capital_min: int = 0,
@@ -157,6 +190,7 @@ def run_source_ai(conn: sqlite3.Connection) -> tuple[int, dict]:
     lead = llm.collect_source_lead(
         avoid_published=published_project_names(conn),
         avoid_unpublished=unpublished_project_names(conn),
+        year_coverage=announced_year_coverage(conn),
     )
     bid = source.insert_lead(
         conn,

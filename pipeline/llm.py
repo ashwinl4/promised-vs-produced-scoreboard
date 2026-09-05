@@ -97,6 +97,7 @@ def _operating_prompt(filename: str) -> str:
 def render_source_prompt(
     avoid_published: list[str] | None = None,
     avoid_unpublished: list[str] | None = None,
+    year_coverage: dict[int, int] | None = None,
 ) -> str:
     """The full Source instructions for finding one new project.
 
@@ -104,6 +105,12 @@ def render_source_prompt(
     find one new qualifying project and end with a single JSON object you can
     ingest with `source-add --json` (CLI) or the Source "Add from JSON" box
     (web).
+
+    `year_coverage` is {announcement year: rows already collected} from
+    `orchestrate.announced_year_coverage`. It is rendered as its own section so
+    the collector can see the shape of what it has already produced. Without it
+    the exclusion lists remove individual sites but never a vintage, and the
+    corpus drifts toward whichever period is most heavily reported.
 
     `avoid_published` is the list of projects already published;
     `avoid_unpublished` the ones collected but not published yet (see the two
@@ -131,6 +138,47 @@ def render_source_prompt(
             "published yet, so no project is excluded on this basis. Collect the best "
             "qualifying project you can find, including the largest and most obvious."
         )
+    if year_coverage:
+        total = sum(year_coverage.values())
+        empty = [y for y, n in sorted(year_coverage.items()) if n == 0]
+        thin = [y for y, n in sorted(year_coverage.items())
+                if 0 < n <= max(1, total // (2 * max(len(year_coverage), 1)))]
+        bars = "\n".join(
+            f"    {y}   {n:>3}  {'#' * n}" for y, n in sorted(year_coverage.items()))
+        prompt += "\n\n## Announcement years already covered — prefer the thin ones\n"
+        if not total:
+            # Nothing collected yet, so naming every empty year as a gap is noise.
+            # Say what the window is and leave the choice open, the way the
+            # exclusion section does when verify_verified is empty.
+            prompt += (
+                "Nothing has been collected yet, so no year is over- or "
+                "under-represented. The eligible window is **January 2017 to "
+                "today**, and every year in it is equally eligible — spread your "
+                "picks across it rather than taking several from one year."
+            )
+        else:
+            prompt += (
+                "This is the corpus you are adding to, counted by announcement "
+                "year:\n\n```\n" + bars + "\n```\n\n"
+                "The eligible window is January 2017 to today and every year in it "
+                "is equally eligible. Heavily reported projects cluster in a few "
+                "years, so an open-ended search returns those years over and over — "
+                "the exclusion lists above remove the individual sites already "
+                "taken, never the vintage. **Prefer a year with few or no rows.** "
+            )
+            if empty:
+                prompt += ("Years with **nothing at all** so far: "
+                           + ", ".join(str(y) for y in empty) + ". Start there. ")
+            elif thin:
+                prompt += ("Thinnest so far: " + ", ".join(str(y) for y in thin) + ". ")
+            prompt += (
+                "\n\nThis is a preference, not a quota, and it never outranks the "
+                "inclusion rules. If a year genuinely has no qualifying project you "
+                "can source and verify, move to the next-thinnest rather than "
+                "lowering the bar or inventing one — a corpus balanced by year but "
+                "padded with weak rows is worse than an unbalanced one."
+            )
+
     if avoid_unpublished:
         # Collected this run (or an earlier one) but not published. Excluding
         # these is what stops the collector from re-finding the same top project
@@ -366,9 +414,11 @@ _SCREEN_SCHEMA = {
 def collect_source_lead(
     avoid_published: list[str] | None = None,
     avoid_unpublished: list[str] | None = None,
+    year_coverage: dict[int, int] | None = None,
 ) -> dict:
     """[API flavour] Find ONE new qualifying project and return its lead dict."""
-    research = _research(render_source_prompt(avoid_published, avoid_unpublished))
+    research = _research(render_source_prompt(avoid_published, avoid_unpublished,
+                                             year_coverage))
     if _looks_like_no_result(research):
         raise LLMUnavailable(
             "the model reported it could not find a qualifying new project"

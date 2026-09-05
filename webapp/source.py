@@ -123,6 +123,7 @@ def source_prompt_page():
         prompt = llm.render_source_prompt(
             avoid_published=orch.published_project_names(conn),
             avoid_unpublished=orch.unpublished_project_names(conn),
+            year_coverage=orch.announced_year_coverage(conn),
         )
     finally:
         conn.close()
